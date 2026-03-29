@@ -1,0 +1,2141 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Industry Sales Dashboard</title>
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, push, remove, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyD13N6aIrJEpjTPNNPjrBLC199E_affmd4",
+    authDomain: "real-3dadd.firebaseapp.com",
+    databaseURL: "https://real-3dadd-default-rtdb.firebaseio.com",
+    projectId: "real-3dadd",
+    storageBucket: "real-3dadd.firebasestorage.app",
+    messagingSenderId: "842531954858",
+    appId: "1:842531954858:web:15c2456cf2c012085f70d3"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  // Expose Firebase functions globally
+  window._fb = { db, ref, set, push, remove, onValue, update };
+  window._fbReady = true;
+  window.dispatchEvent(new Event('fbReady'));
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Tiro+Bangla&family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --card: #111827;
+    --card2: #1a2235;
+    --border: #1e2d45;
+    --accent: #00d4aa;
+    --accent2: #f59e0b;
+    --accent3: #6366f1;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --danger: #ef4444;
+    --success: #22c55e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); min-height: 100vh;
+    background-image: radial-gradient(ellipse at 20% 0%, rgba(0,212,170,0.06) 0%, transparent 50%),
+                      radial-gradient(ellipse at 80% 100%, rgba(99,102,241,0.06) 0%, transparent 50%); }
+  header { padding: 20px 32px; border-bottom: 1px solid var(--border); display: flex; align-items: center;
+    justify-content: space-between; background: rgba(17,24,39,0.8); backdrop-filter: blur(10px);
+    position: sticky; top: 0; z-index: 100; }
+  header h1 { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header-meta { font-size: 12px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; margin-right: 6px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+  main { padding: 24px 32px; max-width: 1500px; margin: 0 auto; }
+  .stats-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 24px; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px;
+    position: relative; overflow: hidden; transition: border-color 0.2s; }
+  .stat-card:hover { border-color: var(--accent); }
+  .stat-card::before { content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%;
+    background: var(--accent-color, var(--accent)); }
+  .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .stat-value { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 800; color: var(--text); }
+  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .filter-section { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 20px; }
+  .filter-title { font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 14px; }
+  .filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .filter-group {
+    display: flex; flex-direction: row; align-items: center; gap: 8px;
+    background: var(--card2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px;
+    transition: border-color 0.2s;
+  }
+  .filter-group:focus-within { border-color: var(--accent); }
+  .filter-group label { font-size: 11px; color: var(--accent); white-space: nowrap; flex-shrink: 0; font-weight: 500; letter-spacing: 0.5px; }
+  .filter-group select, .filter-group input[type="date"], .filter-group input[type="number"], .filter-group input[type="text"] {
+    border: none !important; background: transparent !important; padding: 2px 4px !important;
+    font-size: 13px; min-width: 90px; outline: none !important; color: var(--text);
+    font-family: 'DM Mono', monospace; border-radius: 0 !important; box-shadow: none !important;
+  }
+  /* General inputs outside filter-group */
+  input[type="date"]:not(.filter-group *),
+  input[type="number"]:not(.filter-group *),
+  input[type="text"]:not(.filter-group *) {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+    padding: 8px 11px; font-family: 'DM Mono', monospace; font-size: 13px; outline: none; transition: border-color 0.2s;
+  }
+  select:not(.filter-group select):not(.entry-row select):not(.rate-table select):not(.auth-input) {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+    padding: 8px 11px; font-family: 'DM Mono', monospace; font-size: 13px; outline: none; transition: border-color 0.2s;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); }
+  .btn { padding: 8px 18px; border-radius: 8px; border: none; font-family: 'DM Mono', monospace;
+    font-size: 13px; cursor: pointer; font-weight: 500; transition: all 0.2s; white-space: nowrap; }
+  .btn-primary { background: var(--accent); color: #0a0e1a; }
+  .btn-primary:hover { background: #00b894; transform: translateY(-1px); }
+  .btn-secondary { background: var(--card2); border: 1px solid var(--border); color: var(--text); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-warning { background: var(--accent2); color: #0a0e1a; }
+  .btn-warning:hover { background: #d97706; }
+  .btn-danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+  .btn-danger:hover { background: var(--danger); color: white; }
+  .btn-sm { padding: 4px 10px; font-size: 11px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 18px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 4px; width: fit-content; }
+  .tab { padding: 7px 18px; border-radius: 7px; border: none; font-family: 'DM Mono', monospace;
+    font-size: 12px; cursor: pointer; transition: all 0.2s; background: transparent; color: var(--muted); }
+  .tab.active { background: var(--accent); color: #0a0e1a; font-weight: 600; }
+  .tab:hover:not(.active) { color: var(--text); }
+  .table-section { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .table-header { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .table-header h3 { font-size: 13px; color: var(--text); }
+  .record-count { font-size: 11px; color: var(--muted); background: var(--card2); padding: 3px 10px; border-radius: 20px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { padding: 10px 14px; text-align: left; font-size: 10px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 1px; background: var(--card2); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+  th:hover { color: var(--accent); }
+  td { padding: 10px 14px; font-size: 12px; border-bottom: 1px solid rgba(30,45,69,0.5); transition: background 0.15s; }
+  tr:hover td { background: rgba(0,212,170,0.04); }
+  tr:last-child td { border-bottom: none; }
+  .company-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .pics-cell { color: var(--accent); font-weight: 600; }
+  .taka-cell { color: var(--accent2); font-weight: 600; }
+  .rate-cell { color: var(--accent3); }
+  .date-cell { color: var(--muted); }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px);
+    z-index: 200; display: none; align-items: center; justify-content: center; overflow-y: auto; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 26px;
+    width: 560px; max-width: 98vw; animation: slideUp 0.25s ease; }
+  .modal-wide { width: 700px; }
+  @keyframes slideUp { from{transform:translateY(20px);opacity:0;} to{transform:translateY(0);opacity:1;} }
+  .modal h2 { font-family: 'Syne', sans-serif; font-size: 17px; margin-bottom: 18px; color: var(--accent); }
+  .form-group { margin-bottom: 12px; }
+  .form-group label { display: block; font-size: 10px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-group input, .form-group select { width: 100%; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 18px; justify-content: flex-end; }
+  .company-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .company-tag { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px;
+    font-size: 12px; border: 1px solid var(--border); background: var(--card2); color: var(--text); }
+  .company-tag .del-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+  .company-summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; padding: 18px; }
+  .company-sum-card { background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; transition: border-color 0.2s; }
+  .company-sum-card:hover { border-color: var(--accent); }
+  .csm-name { font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+  .csm-pics { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: var(--accent); }
+  .csm-taka { font-size: 13px; color: var(--accent2); font-weight: 600; margin-top: 3px; }
+  .csm-count { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .chart-section { padding: 18px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; font-size: 12px; }
+  .bar-label { width: 80px; text-align: right; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+  .bar-track { flex: 1; height: 22px; background: var(--card2); border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 8px; font-size: 11px; font-weight: 600; color: #0a0e1a; transition: width 0.6s cubic-bezier(0.4,0,0.2,1); }
+  .bar-total { width: 70px; text-align: right; color: var(--accent); font-weight: 600; font-size: 11px; }
+  .empty-state { padding: 50px; text-align: center; color: var(--muted); }
+  .empty-state .icon { font-size: 36px; margin-bottom: 10px; }
+  .notif { position: fixed; bottom: 24px; right: 24px; background: var(--success); color: #0a0e1a;
+    padding: 11px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; z-index: 300;
+    transform: translateY(80px); opacity: 0; transition: all 0.3s; }
+  .notif.show { transform: translateY(0); opacity: 1; }
+  .notif.error { background: var(--danger); color: white; }
+  .pagination { display: flex; align-items: center; justify-content: space-between; padding: 10px 18px;
+    border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); }
+  .page-btns { display: flex; gap: 4px; }
+  .page-btn { padding: 3px 9px; border-radius: 6px; border: 1px solid var(--border); background: var(--card2);
+    color: var(--text); font-size: 11px; cursor: pointer; font-family: 'DM Mono', monospace; transition: all 0.2s; }
+  .page-btn:hover, .page-btn.active { background: var(--accent); color: #0a0e1a; border-color: var(--accent); }
+  .page-btn:disabled { opacity: 0.3; cursor: default; }
+  .section-gap { margin-bottom: 18px; }
+  .flex-gap { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* Multi-entry rows */
+  .entry-rows { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; max-height: 320px; overflow-y: auto; }
+  .entry-row { display: grid; grid-template-columns: 1fr 1fr 1fr 32px; gap: 8px; align-items: end; background: var(--card2); border-radius: 8px; padding: 10px; border: 1px solid var(--border); }
+  .entry-row .row-label { font-size: 10px; color: var(--muted); text-transform: uppercase; margin-bottom: 3px; }
+  .entry-row select, .entry-row input[type="number"] {
+    background: var(--bg) !important; border: 1px solid var(--border) !important; border-radius: 6px !important;
+    color: var(--text); padding: 7px 10px !important; font-family: 'DM Mono', monospace; font-size: 13px; outline: none; width: 100%;
+  }
+  .form-group select, .form-group input, .rate-table input {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+    padding: 8px 11px; font-family: 'DM Mono', monospace; font-size: 13px; outline: none;
+  }
+  .form-group select:focus, .form-group input:focus, .rate-table input:focus, .entry-row select:focus, .entry-row input:focus { border-color: var(--accent) !important; }
+  .remove-row-btn { background: none; border: 1px solid var(--danger); border-radius: 6px; color: var(--danger); cursor: pointer; font-size: 14px; padding: 6px 8px; line-height: 1; transition: all 0.2s; height: 34px; }
+  .remove-row-btn:hover { background: var(--danger); color: white; }
+  .add-row-btn { background: var(--card2); border: 1px dashed var(--accent); border-radius: 8px; color: var(--accent); cursor: pointer; font-size: 12px; padding: 8px; width: 100%; text-align: center; transition: all 0.2s; margin-bottom: 10px; font-family: 'DM Mono', monospace; }
+  .add-row-btn:hover { background: rgba(0,212,170,0.1); }
+
+  /* Rate per company */
+  .rate-table { width: 100%; border-collapse: collapse; }
+  .rate-table td, .rate-table th { padding: 7px 10px; border: 1px solid var(--border); font-size: 12px; }
+  .rate-table th { background: var(--card2); font-size: 10px; color: var(--muted); text-transform: uppercase; }
+  .rate-table input { width: 100%; padding: 4px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 12px; outline: none; }
+  .rate-table input:focus { border-color: var(--accent); }
+
+  /* ===== FIREBASE SYNC ===== */
+  #syncStatus {
+    position: fixed; bottom: 70px; right: 24px; z-index: 500;
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 14px; font-size: 11px;
+    display: flex; align-items: center; gap: 6px; opacity: 0;
+    transition: opacity 0.3s; pointer-events: none;
+  }
+  #syncStatus.show { opacity: 1; }
+  #syncStatus.syncing { border-color: var(--accent2); color: var(--accent2); }
+  #syncStatus.synced  { border-color: var(--success); color: var(--success); }
+  #syncStatus.error   { border-color: var(--danger); color: var(--danger); }
+  .sync-dot { width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 1s infinite; }
+
+  #fbLoadOverlay {
+    position: fixed; inset: 0; background: rgba(10,14,26,0.85);
+    z-index: 8000; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 14px; backdrop-filter: blur(3px);
+  }
+  .fb-spinner {
+    width: 40px; height: 40px; border: 3px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .fb-load-text { font-size: 13px; color: var(--muted); font-family: 'Noto Sans Bengali', sans-serif; }
+
+  /* ===== PASSWORD / AUTH ===== */
+  #authOverlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: #0a0e1a;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 0;
+  }
+  .auth-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 36px 40px;
+    width: 380px; max-width: 95vw;
+    animation: slideUp 0.3s ease;
+    text-align: center;
+  }
+  .auth-logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px; font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 6px;
+  }
+  .auth-sub { font-size: 12px; color: var(--muted); margin-bottom: 28px; font-family: 'Noto Sans Bengali', sans-serif; }
+  .auth-tabs { display: flex; gap: 6px; margin-bottom: 24px; background: var(--card2); border-radius: 10px; padding: 4px; }
+  .auth-tab {
+    flex: 1; padding: 8px; border-radius: 7px; border: none;
+    font-family: 'DM Mono', monospace; font-size: 12px; cursor: pointer;
+    transition: all 0.2s; background: transparent; color: var(--muted);
+  }
+  .auth-tab.active { background: var(--accent); color: #0a0e1a; font-weight: 600; }
+  .auth-input-wrap { position: relative; margin-bottom: 14px; }
+  .auth-input {
+    width: 100%; padding: 12px 44px 12px 14px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text);
+    font-family: 'DM Mono', monospace; font-size: 14px; outline: none;
+    transition: border-color 0.2s; text-align: center; letter-spacing: 3px;
+  }
+  .auth-input:focus { border-color: var(--accent); }
+  .auth-input.error { border-color: var(--danger); animation: shake 0.4s; }
+  .eye-btn {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 2px;
+  }
+  @keyframes shake { 0%,100%{transform:translateX(0);} 20%,60%{transform:translateX(-6px);} 40%,80%{transform:translateX(6px);} }
+  .auth-btn {
+    width: 100%; padding: 12px; border-radius: 10px; border: none;
+    font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; margin-bottom: 10px;
+  }
+  .auth-btn-primary { background: var(--accent); color: #0a0e1a; }
+  .auth-btn-primary:hover { background: #00b894; transform: translateY(-1px); }
+  .auth-btn-secondary { background: var(--card2); border: 1px solid var(--border); color: var(--muted); }
+  .auth-btn-secondary:hover { border-color: var(--muted); color: var(--text); }
+  .auth-error { color: var(--danger); font-size: 12px; margin-bottom: 10px; min-height: 18px; }
+  .auth-hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  /* Mode badge in header */
+  .mode-badge {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .mode-badge.editor { background: rgba(0,212,170,0.12); border: 1px solid var(--accent); color: var(--accent); }
+  .mode-badge.viewer { background: rgba(100,116,139,0.12); border: 1px solid var(--muted); color: var(--muted); }
+  .mode-badge:hover { opacity: 0.8; }
+
+  /* Locked overlay for input section */
+  .locked-notice {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 14px; color: var(--muted); font-size: 13px;
+    background: rgba(0,0,0,0.2); border-radius: 8px; cursor: pointer;
+    border: 1px dashed var(--border); transition: all 0.2s;
+    font-family: 'Noto Sans Bengali', sans-serif;
+  }
+  .locked-notice:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Input Section */
+  .input-section { background: var(--card); border: 1px solid var(--accent3); border-radius: 12px; overflow: hidden; }
+  .input-section-header { padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; font-size: 14px; font-weight: 600; color: var(--accent3); background: rgba(99,102,241,0.08);
+    transition: background 0.2s; user-select: none; }
+  .input-section-header:hover { background: rgba(99,102,241,0.14); }
+  #inputBody { padding: 18px 20px; border-top: 1px solid rgba(99,102,241,0.3); }
+  .input-section.collapsed #inputBody { display: none; }
+  .input-date-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 4px; }
+
+  @media (max-width: 768px) {
+    main { padding: 14px; }
+    header { padding: 12px 14px; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .filter-row { flex-direction: row; flex-wrap: wrap; }
+    .entry-row { grid-template-columns: 1fr 1fr; }
+    .input-date-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<!-- FIREBASE LOADING -->
+<div id="fbLoadOverlay">
+  <div class="fb-spinner"></div>
+  <div class="fb-load-text">ডাটা লোড হচ্ছে...</div>
+</div>
+
+<!-- SYNC STATUS -->
+<div id="syncStatus">
+  <div class="sync-dot"></div>
+  <span id="syncText">সিঙ্ক হচ্ছে...</span>
+</div>
+
+<!-- AUTH OVERLAY -->
+<div id="authOverlay">
+  <div class="auth-box">
+    <div class="auth-logo">⚡ INDUSTRY SALES</div>
+    <div class="auth-sub">আপনার মোড বেছে নিন</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabViewer" onclick="switchAuthTab('viewer')">👁 Viewer</button>
+      <button class="auth-tab" id="tabEditor" onclick="switchAuthTab('editor')">✏️ Editor</button>
+    </div>
+    <div id="editorPassWrap" style="display:none">
+      <div class="auth-input-wrap">
+        <input class="auth-input" type="password" id="authPassInput" placeholder="পাসওয়ার্ড দিন" onkeydown="if(event.key==='Enter')doLogin()">
+        <button class="eye-btn" onclick="togglePassVisibility()">👁</button>
+      </div>
+    </div>
+    <div class="auth-error" id="authError"></div>
+    <button class="auth-btn auth-btn-primary" onclick="doLogin()" id="loginBtn">প্রবেশ করুন →</button>
+    <div class="auth-hint" id="authHintText">Viewer হিসেবে সব ডাটা দেখতে পাবেন</div>
+  </div>
+</div>
+
+<header>
+  <div>
+    <h1>⚡ INDUSTRY SALES</h1>
+    <div class="header-meta"><span class="dot"></span>Live Dashboard</div>
+  </div>
+  <div class="flex-gap">
+    <div class="mode-badge viewer" id="modeBadge" onclick="showLogoutPrompt()">
+      <span id="modeIcon">👁</span>
+      <span id="modeText">Viewer</span>
+    </div>
+    <button class="btn btn-secondary" id="btnRates" onclick="guardedAction(()=>openModal('rates'))">💰 রেট সেটিং</button>
+    <button class="btn btn-secondary" id="btnCompany" onclick="guardedAction(()=>openModal('company'))">🏢 কোম্পানি</button>
+    <button class="btn btn-secondary" id="btnUpload" onclick="guardedAction(fbSaveAll)" title="সব ডাটা Firebase এ আপলোড করুন" style="display:none">☁️ সব আপলোড</button>
+  </div>
+</header>
+
+<main>
+  <div class="stats-row" id="statsRow">
+    <div class="stat-card" style="--accent-color: var(--accent)">
+      <div class="stat-label">মোট পিছ (ফিল্টার)</div>
+      <div class="stat-value" id="statTotal">0</div>
+      <div class="stat-sub" id="statRows">0 টি রেকর্ড</div>
+    </div>
+    <div class="stat-card" style="--accent-color: var(--accent2)">
+      <div class="stat-label">মোট টাকা (ফিল্টার)</div>
+      <div class="stat-value" id="statTaka">৳0</div>
+      <div class="stat-sub" id="statTakaSub">হিসাব করা হয়েছে</div>
+    </div>
+    <div class="stat-card" style="--accent-color: #3b82f6">
+      <div class="stat-label">মোট পিছ (সব)</div>
+      <div class="stat-value" id="statAllTotal">0</div>
+      <div class="stat-sub" id="statAllRows">মোট রেকর্ড</div>
+    </div>
+    <div class="stat-card" style="--accent-color: var(--accent3)">
+      <div class="stat-label">সবচেয়ে বেশি (কোম্পানি)</div>
+      <div class="stat-value" id="statTopCompany">—</div>
+      <div class="stat-sub" id="statTopPics">ফিল্টার অনুযায়ী</div>
+    </div>
+    <div class="stat-card" style="--accent-color: var(--success)">
+      <div class="stat-label">কোম্পানি সংখ্যা</div>
+      <div class="stat-value" id="statCompanyCount">0</div>
+      <div class="stat-sub">ফিল্টারে সক্রিয়</div>
+    </div>
+  </div>
+
+  <div class="filter-section section-gap">
+    <div class="filter-title">🔍 ফিল্টার করুন</div>
+
+    <!-- ROW 1: নির্দিষ্ট বছর/মাস/দিন -->
+    <div style="font-size:10px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">নির্দিষ্ট তারিখ / মাস / বছর</div>
+    <div class="filter-row" style="margin-bottom:14px;">
+      <div class="filter-group">
+        <label>বছর</label>
+        <select id="yearFilter" onchange="onYearMonthChange()">
+          <option value="">সব বছর</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>মাস</label>
+        <select id="monthFilter" onchange="onYearMonthChange()">
+          <option value="">সব মাস</option>
+          <option value="01">জানুয়ারি</option>
+          <option value="02">ফেব্রুয়ারি</option>
+          <option value="03">মার্চ</option>
+          <option value="04">এপ্রিল</option>
+          <option value="05">মে</option>
+          <option value="06">জুন</option>
+          <option value="07">জুলাই</option>
+          <option value="08">আগস্ট</option>
+          <option value="09">সেপ্টেম্বর</option>
+          <option value="10">অক্টোবর</option>
+          <option value="11">নভেম্বর</option>
+          <option value="12">ডিসেম্বর</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>দিন</label>
+        <select id="dayFilter" onchange="onYearMonthChange()">
+          <option value="">সব দিন</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>কোম্পানি</label>
+        <select id="companyFilter" onchange="onYearMonthChange()">
+          <option value="">সব কোম্পানি</option>
+        </select>
+      </div>
+      <button class="btn btn-secondary" onclick="clearFilters()">✕ ক্লিয়ার</button>
+      <button class="btn btn-primary" onclick="applyFilters()">প্রয়োগ করুন</button>
+    </div>
+
+    <!-- divider -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+      <span style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;">অথবা রেঞ্জ বেছে নিন</span>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>
+
+    <!-- ROW 2: রেঞ্জ শুরু → শেষ -->
+    <div style="font-size:10px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">তারিখ রেঞ্জ (শুরু → শেষ)</div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>শুরু বছর</label>
+        <select id="fromYear">
+          <option value="">বছর</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>শুরু মাস</label>
+        <select id="fromMonth">
+          <option value="">—</option>
+          <option value="01">জানুয়ারি</option>
+          <option value="02">ফেব্রুয়ারি</option>
+          <option value="03">মার্চ</option>
+          <option value="04">এপ্রিল</option>
+          <option value="05">মে</option>
+          <option value="06">জুন</option>
+          <option value="07">জুলাই</option>
+          <option value="08">আগস্ট</option>
+          <option value="09">সেপ্টেম্বর</option>
+          <option value="10">অক্টোবর</option>
+          <option value="11">নভেম্বর</option>
+          <option value="12">ডিসেম্বর</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>শুরু দিন</label>
+        <select id="fromDay">
+          <option value="">দিন</option>
+        </select>
+      </div>
+      <span style="color:var(--muted);font-size:18px;padding:0 4px;">→</span>
+      <div class="filter-group">
+        <label>শেষ বছর</label>
+        <select id="toYear">
+          <option value="">বছর</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>শেষ মাস</label>
+        <select id="toMonth">
+          <option value="">—</option>
+          <option value="01">জানুয়ারি</option>
+          <option value="02">ফেব্রুয়ারি</option>
+          <option value="03">মার্চ</option>
+          <option value="04">এপ্রিল</option>
+          <option value="05">মে</option>
+          <option value="06">জুন</option>
+          <option value="07">জুলাই</option>
+          <option value="08">আগস্ট</option>
+          <option value="09">সেপ্টেম্বর</option>
+          <option value="10">অক্টোবর</option>
+          <option value="11">নভেম্বর</option>
+          <option value="12">ডিসেম্বর</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>শেষ দিন</label>
+        <select id="toDay">
+          <option value="">দিন</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="applyRangeFilter()">▶ রেঞ্জ দেখুন</button>
+    </div>
+  </div>
+
+  <!-- ===== DATA INPUT SECTION ===== -->
+  <div class="input-section section-gap" id="inputSection">
+    <div class="input-section-header" onclick="toggleInputSection()">
+      <span>➕ নতুন ডাটা ইনপুট</span>
+      <span id="inputToggleIcon">▼</span>
+    </div>
+    <div id="inputBody">
+      <div id="inputLockedNotice" class="locked-notice" onclick="showLoginFromLock()" style="display:none">
+        🔒 ডাটা পরিবর্তন করতে Editor হিসেবে লগইন করুন — ক্লিক করুন
+      </div>
+      <div id="inputEditContent">
+      <div class="input-date-row">
+        <div class="filter-group">
+          <label>বছর</label>
+          <select id="inp-year" onchange="updateInpDayOptions()">
+            <option value="">বছর</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>মাস</label>
+          <select id="inp-month" onchange="updateInpDayOptions()">
+            <option value="">মাস</option>
+            <option value="01">জানুয়ারি</option>
+            <option value="02">ফেব্রুয়ারি</option>
+            <option value="03">মার্চ</option>
+            <option value="04">এপ্রিল</option>
+            <option value="05">মে</option>
+            <option value="06">জুন</option>
+            <option value="07">জুলাই</option>
+            <option value="08">আগস্ট</option>
+            <option value="09">সেপ্টেম্বর</option>
+            <option value="10">অক্টোবর</option>
+            <option value="11">নভেম্বর</option>
+            <option value="12">ডিসেম্বর</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>দিন</label>
+          <select id="inp-day">
+            <option value="">দিন</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:flex-end;">
+          <span id="inpDatePreview" style="font-size:13px;color:var(--accent);padding:8px 12px;background:var(--card2);border-radius:8px;border:1px solid var(--border);min-width:120px;text-align:center;">তারিখ নির্বাচন করুন</span>
+        </div>
+      </div>
+      <div id="inp-entry-rows" class="entry-rows" style="margin-top:12px;"></div>
+      <button class="add-row-btn" onclick="addInpRow()">+ আরেকটি কোম্পানি যোগ করুন</button>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px;">
+        <button class="btn btn-secondary" onclick="clearInputSection()">🗑 ক্লিয়ার</button>
+        <button class="btn btn-primary" onclick="saveInputSection()">✅ সব যোগ করুন</button>
+      </div>
+      </div><!-- /inputEditContent -->
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('table', this)">📋 তালিকা</button>
+    <button class="tab" onclick="switchTab('chart', this)">📊 চার্ট</button>
+    <button class="tab" onclick="switchTab('summary', this)">🏢 কোম্পানি সারাংশ</button>
+    <button class="tab" onclick="switchTab('taka', this)">💰 টাকার হিসাব</button>
+  </div>
+
+  <div id="view-table">
+    <div class="table-section">
+      <div class="table-header">
+        <h3>সেল ডাটা</h3>
+        <span class="record-count" id="recordCount">0 রেকর্ড</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="sortBy('sl')">#</th>
+              <th onclick="sortBy('Date')">তারিখ</th>
+              <th onclick="sortBy('Company')">কোম্পানি</th>
+              <th onclick="sortBy('Pics')">পিছ</th>
+              <th onclick="sortBy('Rate')">রেট (৳)</th>
+              <th onclick="sortBy('Taka')">টাকা (৳)</th>
+              <th>অ্যাকশন</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span id="paginationInfo"></span>
+        <div class="page-btns" id="pageBtns"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="view-chart" style="display:none">
+    <div class="table-section">
+      <div class="table-header"><h3>কোম্পানি ওয়াইজ পিছ (বার চার্ট)</h3></div>
+      <div class="chart-section" id="chartArea"></div>
+    </div>
+  </div>
+
+  <div id="view-summary" style="display:none">
+    <div class="table-section">
+      <div class="table-header"><h3>কোম্পানি সারাংশ</h3></div>
+      <div class="company-summary-grid" id="summaryGrid"></div>
+    </div>
+  </div>
+
+  <div id="view-taka" style="display:none">
+    <div class="table-section">
+      <div class="table-header"><h3>💰 কোম্পানি ওয়াইজ টাকার হিসাব</h3>
+        <span class="record-count" id="takaTotal">মোট: ৳0</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>কোম্পানি</th>
+              <th>মোট পিছ</th>
+              <th>রেট (৳/পিছ)</th>
+              <th>মোট টাকা</th>
+              <th>এন্ট্রি সংখ্যা</th>
+            </tr>
+          </thead>
+          <tbody id="takaBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Add Data Modal (Multi-entry) -->
+<div class="modal-overlay" id="modal-add">
+  <div class="modal modal-wide">
+    <h2>➕ নতুন সেল ডাটা (একাধিক কোম্পানি)</h2>
+    <div class="form-group">
+      <label>তারিখ (সব এন্ট্রির জন্য)</label>
+      <input type="date" id="inp-date" style="width:200px">
+    </div>
+    <div id="entry-rows" class="entry-rows"></div>
+    <button class="add-row-btn" onclick="addEntryRow()">+ আরেকটি কোম্পানি যোগ করুন</button>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('add')">বাতিল</button>
+      <button class="btn btn-primary" onclick="saveMultiEntry()">✅ সব যোগ করুন</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rate Settings Modal -->
+<div class="modal-overlay" id="modal-rates">
+  <div class="modal modal-wide">
+    <h2>💰 প্রতি পিছ রেট সেটিং (৳)</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">প্রতিটি কোম্পানির জন্য পিছ প্রতি রেট লিখুন। টাকা = পিছ × রেট।</p>
+    <div style="overflow-y:auto;max-height:400px;">
+      <table class="rate-table">
+        <thead><tr><th>কোম্পানি</th><th>রেট (৳/পিছ)</th><th>উদাহরণ (১০০০ পিছ)</th></tr></thead>
+        <tbody id="rateTableBody"></tbody>
+      </table>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('rates')">বন্ধ</button>
+      <button class="btn btn-primary" onclick="saveRates()">💾 সেভ করুন</button>
+    </div>
+  </div>
+</div>
+
+<!-- Company Manager -->
+<div class="modal-overlay" id="modal-company">
+  <div class="modal">
+    <h2>🏢 কোম্পানি ম্যানেজার</h2>
+    <div class="form-group">
+      <label>নতুন কোম্পানি</label>
+      <div class="flex-gap">
+        <input type="text" id="inp-new-company" placeholder="কোম্পানির নাম" style="flex:1;" onkeydown="if(event.key==='Enter')addCompany()">
+        <button class="btn btn-primary" onclick="addCompany()">যোগ করুন</button>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-top:14px;margin-bottom:8px;text-transform:uppercase;">বর্তমান কোম্পানিসমূহ</div>
+    <div class="company-list" id="companyTagList"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('company')">বন্ধ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="modal-edit">
+  <div class="modal">
+    <h2>✏️ ডাটা এডিট করুন</h2>
+    <input type="hidden" id="edit-idx">
+    <div class="form-group"><label>তারিখ</label><input type="date" id="edit-date"></div>
+    <div class="form-group"><label>কোম্পানি</label><select id="edit-company"></select></div>
+    <div class="form-group"><label>পিছ</label><input type="number" id="edit-pics" min="0"></div>
+    <div class="form-group"><label>রেট (৳/পিছ) — ০ হলে ডিফল্ট রেট ব্যবহার হবে</label><input type="number" id="edit-rate" min="0" placeholder="০ = ডিফল্ট রেট"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('edit')">বাতিল</button>
+      <button class="btn btn-primary" onclick="saveEdit()">💾 সেভ</button>
+    </div>
+  </div>
+</div>
+
+<div class="notif" id="notif"></div>
+
+<script>
+// ===== DATA =====
+let rawData = [
+  {Date:"2023-06-06",Pics:3205,Company:"Jewel"},
+  {Date:"2023-06-17",Pics:4221,Company:"Akter"},
+  {Date:"2023-06-17",Pics:1506,Company:"Akter"},
+  {Date:"2023-06-18",Pics:1344,Company:"Ajij"},
+  {Date:"2023-07-29",Pics:1000,Company:"Yousuf"},
+  {Date:"2023-08-03",Pics:1000,Company:"Sujon"},
+  {Date:"2023-08-06",Pics:694,Company:"Jewel"},
+  {Date:"2023-08-10",Pics:666,Company:"Jewel"},
+  {Date:"2023-09-21",Pics:1262,Company:"Ajij"},
+  {Date:"2023-08-10",Pics:1428,Company:"Ajij"},
+  {Date:"2023-08-23",Pics:710,Company:"Jewel"},
+  {Date:"2023-09-07",Pics:915,Company:"Jewel"},
+  {Date:"2023-10-05",Pics:235,Company:"Jewel"},
+  {Date:"2023-10-08",Pics:1275,Company:"Yousuf"},
+  {Date:"2023-12-14",Pics:15540,Company:"Akter"},
+  {Date:"2023-12-27",Pics:4520,Company:"Akter"},
+  {Date:"2024-01-15",Pics:4100,Company:"Akter"},
+  {Date:"2024-01-16",Pics:1331,Company:"Ajij"},
+  {Date:"2024-02-25",Pics:6817,Company:"Akter"},
+  {Date:"2024-03-21",Pics:3673,Company:"Akter"},
+  {Date:"2024-03-27",Pics:1760,Company:"Yousuf"},
+  {Date:"2024-03-30",Pics:3304,Company:"Akter"},
+  {Date:"2024-04-07",Pics:2083,Company:"AG"},
+  {Date:"2024-05-07",Pics:2990,Company:"Yousuf"},
+  {Date:"2024-04-20",Pics:400,Company:"AG"},
+  {Date:"2024-04-21",Pics:2014,Company:"Yousuf"},
+  {Date:"2024-05-13",Pics:500,Company:"Energy"},
+  {Date:"2024-05-13",Pics:211,Company:"Yousuf"},
+  {Date:"2024-04-16",Pics:1117,Company:"Energy"},
+  {Date:"2024-05-16",Pics:440,Company:"Yousuf"},
+  {Date:"2024-05-20",Pics:443,Company:"Energy"},
+  {Date:"2024-05-20",Pics:250,Company:"Yousuf"},
+  {Date:"2024-05-22",Pics:500,Company:"Energy"},
+  {Date:"2024-05-22",Pics:298,Company:"Yousuf"},
+  {Date:"2024-04-20",Pics:176,Company:"Yousuf"},
+  {Date:"2024-04-21",Pics:400,Company:"AG"},
+  {Date:"2024-04-22",Pics:800,Company:"Energy"},
+  {Date:"2024-04-22",Pics:471,Company:"Yousuf"},
+  {Date:"2024-04-24",Pics:200,Company:"Energy"},
+  {Date:"2024-04-24",Pics:250,Company:"Yousuf"},
+  {Date:"2024-04-24",Pics:400,Company:"Energy"},
+  {Date:"2024-04-24",Pics:193,Company:"Yousuf"},
+  {Date:"2024-04-26",Pics:654,Company:"Energy"},
+  {Date:"2024-04-26",Pics:250,Company:"Yousuf"},
+  {Date:"2024-04-26",Pics:394,Company:"AG"},
+  {Date:"2024-04-27",Pics:608,Company:"AG"},
+  {Date:"2024-04-27",Pics:650,Company:"Energy"},
+  {Date:"2024-04-27",Pics:300,Company:"Yousuf"},
+  {Date:"2024-04-29",Pics:500,Company:"Energy"},
+  {Date:"2024-04-29",Pics:236,Company:"Yousuf"},
+  {Date:"2024-04-29",Pics:500,Company:"Energy"},
+  {Date:"2024-04-29",Pics:248,Company:"Yousuf"},
+  {Date:"2024-05-01",Pics:278,Company:"Yousuf"},
+  {Date:"2024-04-30",Pics:216,Company:"Energy"},
+  {Date:"2024-05-01",Pics:454,Company:"Energy"},
+  {Date:"2024-05-02",Pics:303,Company:"Energy"},
+  {Date:"2024-05-02",Pics:1000,Company:"AG"},
+  {Date:"2024-05-03",Pics:280,Company:"Yousuf"},
+  {Date:"2024-05-04",Pics:295,Company:"Energy"},
+  {Date:"2024-05-04",Pics:340,Company:"Energy"},
+  {Date:"2024-05-26",Pics:360,Company:"Yousuf"},
+  {Date:"2024-05-05",Pics:400,Company:"Energy"},
+  {Date:"2024-05-05",Pics:237,Company:"Yousuf"},
+  {Date:"2024-05-06",Pics:507,Company:"Energy"},
+  {Date:"2024-05-07",Pics:500,Company:"Energy"},
+  {Date:"2024-05-07",Pics:297,Company:"Yousuf"},
+  {Date:"2024-05-07",Pics:550,Company:"AG"},
+  {Date:"2024-05-08",Pics:500,Company:"Energy"},
+  {Date:"2024-05-08",Pics:199,Company:"Yousuf"},
+  {Date:"2024-05-08",Pics:600,Company:"Energy"},
+  {Date:"2024-05-08",Pics:261,Company:"Yousuf"},
+  {Date:"2024-05-11",Pics:500,Company:"Energy"},
+  {Date:"2024-05-11",Pics:206,Company:"Yousuf"},
+  {Date:"2024-05-12",Pics:500,Company:"Energy"},
+  {Date:"2024-05-12",Pics:285,Company:"Yousuf"},
+  {Date:"2024-05-26",Pics:600,Company:"Energy"},
+  {Date:"2024-05-30",Pics:750,Company:"Energy"},
+  {Date:"2024-05-30",Pics:242,Company:"Yousuf"},
+  {Date:"2024-06-02",Pics:500,Company:"Energy"},
+  {Date:"2024-06-02",Pics:395,Company:"Yousuf"},
+  {Date:"2024-06-05",Pics:761,Company:"Energy"},
+  {Date:"2024-06-12",Pics:772,Company:"Yousuf"},
+  {Date:"2024-06-12",Pics:2913,Company:"Energy"},
+  {Date:"2024-06-14",Pics:597,Company:"Energy"},
+  {Date:"2024-06-22",Pics:1684,Company:"Energy"},
+  {Date:"2024-07-27",Pics:2627,Company:"Energy"},
+  {Date:"2024-07-30",Pics:5500,Company:"Akter"},
+  {Date:"2024-08-15",Pics:2856,Company:"Energy"},
+  {Date:"2024-08-15",Pics:550,Company:"Arafat"},
+  {Date:"2024-08-19",Pics:650,Company:"Arafat"},
+  {Date:"2024-09-01",Pics:186,Company:"Jewel"},
+  {Date:"2024-09-05",Pics:833,Company:"Arafat"},
+  {Date:"2024-09-29",Pics:250,Company:"Jewel"},
+  {Date:"2024-09-29",Pics:1600,Company:"Thai"},
+  {Date:"2024-09-29",Pics:5340,Company:"Akter"},
+  {Date:"2024-10-01",Pics:511,Company:"Arafat"},
+  {Date:"2024-03-06",Pics:516,Company:"Yousuf"},
+  {Date:"2024-03-06",Pics:1000,Company:"Energy"},
+  {Date:"2024-03-09",Pics:375,Company:"Yousuf"},
+  {Date:"2024-03-13",Pics:400,Company:"Energy"},
+  {Date:"2024-03-18",Pics:305,Company:"Yousuf"},
+  {Date:"2024-03-17",Pics:200,Company:"Energy"},
+  {Date:"2024-03-19",Pics:324,Company:"Energy"},
+  {Date:"2024-03-20",Pics:200,Company:"Energy"},
+  {Date:"2024-03-20",Pics:184,Company:"Yousuf"},
+  {Date:"2024-03-21",Pics:500,Company:"Energy"},
+  {Date:"2024-03-21",Pics:258,Company:"Yousuf"},
+  {Date:"2024-03-22",Pics:250,Company:"Yousuf"},
+  {Date:"2024-03-23",Pics:400,Company:"Energy"},
+  {Date:"2024-03-23",Pics:250,Company:"Yousuf"},
+  {Date:"2024-03-25",Pics:200,Company:"Energy"},
+  {Date:"2024-03-25",Pics:214,Company:"Yousuf"},
+  {Date:"2025-03-20",Pics:3673,Company:"Akter"},
+  {Date:"2025-03-26",Pics:600,Company:"Energy"},
+  {Date:"2025-03-26",Pics:299,Company:"Yousuf"},
+  {Date:"2024-03-28",Pics:500,Company:"Energy"},
+  {Date:"2024-03-28",Pics:359,Company:"Yousuf"},
+  {Date:"2024-03-31",Pics:435,Company:"Yousuf"},
+  {Date:"2024-03-31",Pics:600,Company:"Energy"},
+  {Date:"2024-03-31",Pics:374,Company:"ABC"},
+  {Date:"2024-04-01",Pics:1072,Company:"AG"},
+  {Date:"2024-04-01",Pics:250,Company:"Energy"},
+  {Date:"2024-04-01",Pics:176,Company:"Yousuf"},
+  {Date:"2024-04-02",Pics:200,Company:"Energy"},
+  {Date:"2024-04-02",Pics:160,Company:"Yousuf"},
+  {Date:"2024-04-04",Pics:486,Company:"ABC"},
+  {Date:"2024-04-04",Pics:697,Company:"Energy"},
+  {Date:"2024-04-04",Pics:511,Company:"AG"},
+  {Date:"2024-04-06",Pics:400,Company:"Energy"},
+  {Date:"2024-04-06",Pics:275,Company:"Yousuf"},
+  {Date:"2024-04-07",Pics:227,Company:"Yousuf"},
+  {Date:"2024-04-07",Pics:500,Company:"AG"},
+  {Date:"2024-04-08",Pics:400,Company:"Energy"},
+  {Date:"2024-04-08",Pics:210,Company:"Yousuf"},
+  {Date:"2024-04-09",Pics:400,Company:"Energy"},
+  {Date:"2024-04-16",Pics:1064,Company:"Energy"},
+  {Date:"2024-04-18",Pics:400,Company:"AG"},
+  {Date:"2024-04-18",Pics:650,Company:"Energy"},
+  {Date:"2024-04-20",Pics:2000,Company:"AG"},
+  {Date:"2024-06-08",Pics:272,Company:"Yousuf"},
+  {Date:"2024-06-08",Pics:1000,Company:"Energy"},
+  {Date:"2024-06-11",Pics:250,Company:"Yousuf"},
+  {Date:"2024-06-11",Pics:467,Company:"Energy"},
+  {Date:"2024-06-12",Pics:850,Company:"Energy"},
+  {Date:"2024-06-12",Pics:250,Company:"Yousuf"},
+  {Date:"2024-06-15",Pics:1087,Company:"Energy"},
+  {Date:"2024-07-03",Pics:984,Company:"Energy"},
+  {Date:"2024-07-10",Pics:272,Company:"Energy"},
+  {Date:"2024-07-11",Pics:248,Company:"Energy"},
+  {Date:"2024-07-14",Pics:519,Company:"Energy"},
+  {Date:"2024-07-15",Pics:270,Company:"Energy"},
+  {Date:"2024-07-16",Pics:511,Company:"Energy"},
+  {Date:"2024-07-24",Pics:300,Company:"Energy"},
+  {Date:"2024-07-25",Pics:305,Company:"Energy"},
+  {Date:"2024-07-28",Pics:377,Company:"Energy"},
+  {Date:"2024-07-29",Pics:407,Company:"Energy"},
+  {Date:"2024-07-31",Pics:505,Company:"Energy"},
+  {Date:"2024-08-07",Pics:550,Company:"Energy"},
+  {Date:"2024-08-08",Pics:600,Company:"Energy"},
+  {Date:"2024-08-11",Pics:417,Company:"Energy"},
+  {Date:"2024-09-11",Pics:300,Company:"Yousuf"},
+  {Date:"2024-09-17",Pics:1600,Company:"Sahalam"},
+  {Date:"2024-09-18",Pics:300,Company:"Arafat"},
+  {Date:"2024-10-06",Pics:1000,Company:"Thai"},
+  {Date:"2024-10-09",Pics:1500,Company:"Thai"},
+  {Date:"2024-10-17",Pics:839,Company:"Energy"},
+  {Date:"2024-11-02",Pics:245,Company:"Jewel"},
+  {Date:"2024-11-02",Pics:211,Company:"Yousuf"},
+  {Date:"2024-11-24",Pics:697,Company:"Jewel"},
+  {Date:"2024-12-03",Pics:666,Company:"Arafat"},
+  {Date:"2024-12-22",Pics:1617,Company:"Jewel"},
+  {Date:"2024-12-24",Pics:504,Company:"Sumon"},
+  {Date:"2024-12-24",Pics:1827,Company:"Thai"},
+  {Date:"2024-12-30",Pics:1012,Company:"Ayesah"},
+  {Date:"2025-01-02",Pics:1024,Company:"Thai"},
+  {Date:"2025-01-05",Pics:500,Company:"Arafat"},
+  {Date:"2025-01-05",Pics:917,Company:"Ayesah"},
+  {Date:"2025-01-08",Pics:600,Company:"Arafat"},
+  {Date:"2025-01-08",Pics:12000,Company:"Akter"},
+  {Date:"2025-01-09",Pics:1475,Company:"Unknown"},
+  {Date:"2025-01-14",Pics:600,Company:"Arafat"},
+  {Date:"2025-01-14",Pics:1200,Company:"Ayesah"},
+  {Date:"2025-01-18",Pics:600,Company:"Arafat"},
+  {Date:"2025-01-19",Pics:1209,Company:"Ayesah"},
+  {Date:"2025-01-21",Pics:271,Company:"Arafat"},
+  {Date:"2025-01-22",Pics:500,Company:"Arafat"},
+  {Date:"2025-01-25",Pics:1287,Company:"Thai"},
+  {Date:"2025-01-25",Pics:520,Company:"Jewel"},
+  {Date:"2025-01-26",Pics:1000,Company:"Energy"},
+  {Date:"2025-01-28",Pics:1231,Company:"Jewel"},
+  {Date:"2025-02-04",Pics:1213,Company:"Thai"},
+  {Date:"2025-02-01",Pics:1223,Company:"Energy"},
+  {Date:"2025-02-01",Pics:600,Company:"Arafat"},
+  {Date:"2025-02-06",Pics:674,Company:"Jewel"},
+  {Date:"2025-02-10",Pics:549,Company:"Jewel"},
+  {Date:"2025-02-10",Pics:569,Company:"Energy"},
+  {Date:"2025-02-10",Pics:510,Company:"Ayesah"},
+  {Date:"2025-02-12",Pics:648,Company:"Arafat"},
+  {Date:"2025-02-14",Pics:507,Company:"Fatema"},
+  {Date:"2025-02-14",Pics:768,Company:"Energy"},
+  {Date:"2025-02-17",Pics:1257,Company:"Jewel"},
+  {Date:"2025-02-17",Pics:1011,Company:"Liyakot"},
+  {Date:"2025-02-19",Pics:1007,Company:"Fatema"},
+  {Date:"2025-02-20",Pics:1027,Company:"Energy"},
+  {Date:"2025-02-22",Pics:1205,Company:"Jewel"},
+  {Date:"2025-02-26",Pics:790,Company:"Energy"},
+  {Date:"2025-02-26",Pics:750,Company:"Ayesah"},
+  {Date:"2025-03-02",Pics:2078,Company:"Jewel"},
+  {Date:"2025-03-02",Pics:1015,Company:"Liyakot"},
+  {Date:"2025-03-03",Pics:508,Company:"Ayesah"},
+  {Date:"2025-03-04",Pics:602,Company:"Ayesah"},
+  {Date:"2025-03-08",Pics:1200,Company:"Jewel"},
+  {Date:"2025-03-05",Pics:1023,Company:"Liyakot"},
+  {Date:"2025-03-10",Pics:1220,Company:"Ayesah"},
+  {Date:"2025-03-10",Pics:938,Company:"Energy"},
+  {Date:"2025-03-19",Pics:609,Company:"Arafat"},
+  {Date:"2025-05-03",Pics:1049,Company:"Ayesah"},
+  {Date:"2025-05-03",Pics:460,Company:"Jewel"},
+  {Date:"2025-05-04",Pics:748,Company:"Energy"},
+  {Date:"2025-05-04",Pics:611,Company:"Jewel"},
+  {Date:"2025-05-06",Pics:475,Company:"Jewel"},
+  {Date:"2025-05-06",Pics:1000,Company:"Energy"},
+  {Date:"2025-05-06",Pics:604,Company:"Ayesah"},
+  {Date:"2025-05-06",Pics:1010,Company:"Thai"},
+  {Date:"2025-05-08",Pics:1215,Company:"Jewel"},
+  {Date:"2025-05-11",Pics:914,Company:"Thai"},
+  {Date:"2025-05-12",Pics:508,Company:"Ayesah"},
+  {Date:"2025-05-12",Pics:464,Company:"Energy"},
+  {Date:"2025-05-13",Pics:404,Company:"Jewel"},
+  {Date:"2025-05-19",Pics:400,Company:"Energy"},
+  {Date:"2025-05-14",Pics:663,Company:"Ayesah"},
+  {Date:"2025-05-14",Pics:900,Company:"Jewel"},
+  {Date:"2025-05-14",Pics:404,Company:"Energy"},
+  {Date:"2025-05-17",Pics:608,Company:"Jewel"},
+  {Date:"2025-05-17",Pics:654,Company:"Ayesah"},
+  {Date:"2025-05-18",Pics:600,Company:"Energy"},
+  {Date:"2025-05-18",Pics:1225,Company:"Thai"},
+  {Date:"2025-05-22",Pics:606,Company:"Jewel"},
+  {Date:"2025-05-22",Pics:602,Company:"Ayesah"},
+  {Date:"2025-05-24",Pics:600,Company:"Energy"},
+  {Date:"2025-05-24",Pics:609,Company:"Jewel"},
+  {Date:"2025-05-26",Pics:550,Company:"Energy"},
+  {Date:"2025-05-26",Pics:659,Company:"Ayesah"},
+  {Date:"2025-05-26",Pics:500,Company:"Ayesah"},
+  {Date:"2025-05-28",Pics:409,Company:"Energy"},
+  {Date:"2025-05-31",Pics:655,Company:"Jewel"},
+  {Date:"2025-05-31",Pics:1185,Company:"Thai"},
+  {Date:"2025-06-02",Pics:450,Company:"Ayesah"},
+  {Date:"2025-06-02",Pics:580,Company:"Energy"},
+  {Date:"2025-06-03",Pics:936,Company:"Thai"},
+  {Date:"2025-06-03",Pics:300,Company:"Ayesah"},
+  {Date:"2025-06-03",Pics:309,Company:"Energy"},
+  {Date:"2025-06-16",Pics:916,Company:"Ayesah"},
+  {Date:"2025-06-16",Pics:900,Company:"Energy"},
+  {Date:"2025-06-17",Pics:813,Company:"Jewel"},
+  {Date:"2025-06-18",Pics:435,Company:"Jewel"},
+  {Date:"2025-06-19",Pics:307,Company:"Jewel"},
+  {Date:"2025-06-22",Pics:611,Company:"Jewel"},
+  {Date:"2025-06-22",Pics:710,Company:"Ayesah"},
+  {Date:"2025-06-22",Pics:627,Company:"Energy"},
+  {Date:"2025-06-23",Pics:760,Company:"Jewel"},
+  {Date:"2025-06-23",Pics:530,Company:"Ayesah"},
+  {Date:"2025-06-23",Pics:315,Company:"Energy"},
+  {Date:"2025-06-25",Pics:424,Company:"Energy"},
+  {Date:"2025-06-25",Pics:500,Company:"Ayesah"},
+  {Date:"2025-06-30",Pics:1217,Company:"Thai"},
+  {Date:"2025-07-02",Pics:400,Company:"Jewel"},
+  {Date:"2025-07-02",Pics:1220,Company:"Thai"},
+  {Date:"2025-07-06",Pics:450,Company:"Ayesah"},
+  {Date:"2025-07-06",Pics:400,Company:"Jewel"},
+  {Date:"2025-07-09",Pics:1231,Company:"Thai"},
+  {Date:"2025-07-09",Pics:599,Company:"Jewel"},
+  {Date:"2025-07-15",Pics:631,Company:"Jewel"},
+  {Date:"2025-07-16",Pics:1520,Company:"Thai"},
+  {Date:"2025-07-17",Pics:609,Company:"Ayesah"},
+  {Date:"2025-07-21",Pics:597,Company:"Jewel"},
+  {Date:"2025-07-21",Pics:670,Company:"Ayesah"},
+  {Date:"2025-07-23",Pics:1290,Company:"Thai"},
+  {Date:"2025-07-24",Pics:1500,Company:"ABC"},
+  {Date:"2025-08-05",Pics:1000,Company:"Ayesah"},
+  {Date:"2025-08-06",Pics:617,Company:"Jewel"},
+  {Date:"2025-06-08",Pics:1600,Company:"TBS"},
+  {Date:"2025-08-12",Pics:1400,Company:"TBS"},
+  {Date:"2025-08-14",Pics:1600,Company:"TBS"},
+  {Date:"2025-08-18",Pics:300,Company:"Jewel"},
+  {Date:"2025-03-12",Pics:599,Company:"Ayesah"},
+  {Date:"2025-03-12",Pics:482,Company:"Energy"},
+  {Date:"2025-03-13",Pics:2971,Company:"Jewel"},
+  {Date:"2025-03-14",Pics:1031,Company:"Liyakot"},
+  {Date:"2025-03-15",Pics:308,Company:"Energy"},
+  {Date:"2025-03-15",Pics:600,Company:"Ayesah"},
+  {Date:"2025-03-17",Pics:503,Company:"Energy"},
+  {Date:"2025-03-17",Pics:400,Company:"Ayesah"},
+  {Date:"2025-03-19",Pics:1300,Company:"Jewel"},
+  {Date:"2025-03-22",Pics:899,Company:"Jewel"},
+  {Date:"2025-03-20",Pics:1215,Company:"Liyakot"},
+  {Date:"2025-03-22",Pics:604,Company:"Ayesah"},
+  {Date:"2025-03-22",Pics:597,Company:"Energy"},
+  {Date:"2025-03-23",Pics:598,Company:"Ayesah"},
+  {Date:"2025-03-24",Pics:652,Company:"Jewel"},
+  {Date:"2025-03-24",Pics:598,Company:"Energy"},
+  {Date:"2025-03-25",Pics:501,Company:"Energy"},
+  {Date:"2025-03-25",Pics:606,Company:"Ayesah"},
+  {Date:"2025-03-26",Pics:1058,Company:"Jewel"},
+  {Date:"2025-03-27",Pics:250,Company:"Energy"},
+  {Date:"2025-03-27",Pics:370,Company:"Ayesah"},
+  {Date:"2025-04-05",Pics:250,Company:"Energy"},
+  {Date:"2025-04-05",Pics:357,Company:"Ayesah"},
+  {Date:"2025-04-05",Pics:620,Company:"Jewel"},
+  {Date:"2025-04-07",Pics:602,Company:"Jewel"},
+  {Date:"2025-04-07",Pics:500,Company:"Energy"},
+  {Date:"2025-04-07",Pics:404,Company:"Ayesah"},
+  {Date:"2025-04-10",Pics:750,Company:"Jewel"},
+  {Date:"2025-04-12",Pics:991,Company:"Energy"},
+  {Date:"2025-04-12",Pics:700,Company:"Jewel"},
+  {Date:"2025-04-13",Pics:680,Company:"Energy"},
+  {Date:"2025-04-13",Pics:1000,Company:"Ayesah"},
+  {Date:"2025-04-15",Pics:617,Company:"Jewel"},
+  {Date:"2025-04-16",Pics:513,Company:"Energy"},
+  {Date:"2025-04-16",Pics:417,Company:"Ayesah"},
+  {Date:"2025-04-17",Pics:602,Company:"Jewel"},
+  {Date:"2025-04-19",Pics:600,Company:"Jewel"},
+  {Date:"2025-04-21",Pics:598,Company:"Energy"},
+  {Date:"2025-04-23",Pics:1264,Company:"Ayesah"},
+  {Date:"2025-04-23",Pics:1228,Company:"Jewel"},
+  {Date:"2025-04-24",Pics:595,Company:"Energy"},
+  {Date:"2025-04-24",Pics:628,Company:"Jewel"},
+  {Date:"2025-04-26",Pics:599,Company:"Energy"},
+  {Date:"2025-04-27",Pics:305,Company:"Ayesah"},
+  {Date:"2025-04-28",Pics:1232,Company:"Jewel"},
+  {Date:"2025-04-28",Pics:598,Company:"Ayesah"},
+  {Date:"2025-04-28",Pics:300,Company:"Energy"},
+  {Date:"2025-04-29",Pics:610,Company:"Jewel"},
+  {Date:"2025-08-21",Pics:2600,Company:"TBS"},
+  {Date:"2025-08-21",Pics:1639,Company:"Ayesah"},
+  {Date:"2025-08-23",Pics:477,Company:"Jewel"},
+  {Date:"2025-08-27",Pics:473,Company:"Energy"},
+  {Date:"2025-08-27",Pics:3025,Company:"Sumon"},
+  {Date:"2025-08-29",Pics:1200,Company:"TBS"},
+  {Date:"2025-09-03",Pics:2196,Company:"Thai"},
+  {Date:"2025-09-08",Pics:741,Company:"Ayesah"},
+  {Date:"2025-09-08",Pics:600,Company:"Energy"},
+  {Date:"2025-09-09",Pics:5000,Company:"TBS"},
+  {Date:"2025-09-11",Pics:2600,Company:"TBS"},
+  {Date:"2025-09-15",Pics:1800,Company:"Thai"},
+  {Date:"2025-09-18",Pics:1200,Company:"Thai"},
+  {Date:"2025-09-18",Pics:1800,Company:"TBS"},
+  {Date:"2025-09-23",Pics:658,Company:"Energy"},
+  {Date:"2025-09-21",Pics:600,Company:"Arafat"},
+  {Date:"2025-09-23",Pics:732,Company:"Ayesah"},
+  {Date:"2025-09-25",Pics:2000,Company:"TBS"},
+  {Date:"2025-09-28",Pics:316,Company:"Energy"},
+  {Date:"2025-09-30",Pics:190,Company:"Arafat"},
+  {Date:"2025-10-09",Pics:3000,Company:"TBS"},
+  {Date:"2025-09-14",Pics:496,Company:"Ayesah"},
+  {Date:"2025-10-16",Pics:3000,Company:"TBS"},
+  {Date:"2025-10-28",Pics:1356,Company:"Jewel"},
+  {Date:"2025-10-22",Pics:250,Company:"AG"},
+  {Date:"2025-10-25",Pics:1200,Company:"Thai"},
+  {Date:"2025-10-28",Pics:1319,Company:"Thai"},
+  {Date:"2025-10-29",Pics:200,Company:"BKB"},
+  {Date:"2025-11-06",Pics:2400,Company:"TBS"},
+  {Date:"2025-11-08",Pics:630,Company:"Jewel"},
+  {Date:"2025-11-08",Pics:530,Company:"Total"},
+  {Date:"2025-11-11",Pics:754,Company:"Jewel"},
+  {Date:"2025-11-17",Pics:928,Company:"Energy"},
+  {Date:"2025-11-19",Pics:600,Company:"Jewel"},
+  {Date:"2025-11-20",Pics:683,Company:"Jewel"},
+  {Date:"2025-11-24",Pics:1072,Company:"Energy"},
+  {Date:"2025-11-25",Pics:615,Company:"Jewel"},
+  {Date:"2025-12-04",Pics:1000,Company:"Energy"},
+  {Date:"2025-11-29",Pics:1200,Company:"Thai"},
+  {Date:"2025-11-30",Pics:1031,Company:"Thai"},
+  {Date:"2025-12-06",Pics:1607,Company:"Thai"},
+  {Date:"2025-12-08",Pics:750,Company:"Jewel"},
+  {Date:"2025-11-06",Pics:2400,Company:"TBS"},
+  {Date:"2025-12-11",Pics:1000,Company:"Energy"},
+  {Date:"2025-12-12",Pics:834,Company:"Jewel"},
+  {Date:"2025-12-13",Pics:600,Company:"Thai"},
+  {Date:"2025-12-14",Pics:1210,Company:"Thai"},
+  {Date:"2025-12-15",Pics:1303,Company:"Thai"},
+  {Date:"2025-12-18",Pics:1126,Company:"Energy"},
+  {Date:"2025-12-18",Pics:300,Company:"Jewel"},
+  {Date:"2025-12-21",Pics:1553,Company:"Thai"},
+  {Date:"2025-12-24",Pics:500,Company:"Jewel"},
+  {Date:"2025-12-25",Pics:600,Company:"Jewel"},
+  {Date:"2025-12-25",Pics:1676,Company:"Thai"},
+  {Date:"2025-12-31",Pics:510,Company:"Jewel"},
+  {Date:"2025-12-31",Pics:971,Company:"Thai"},
+  {Date:"2026-01-01",Pics:1407,Company:"Thai"},
+  {Date:"2026-01-03",Pics:300,Company:"Jewel"},
+  {Date:"2026-01-03",Pics:1000,Company:"Ayesah"},
+  {Date:"2026-01-03",Pics:2018,Company:"Ajij"},
+  {Date:"2026-01-05",Pics:1200,Company:"Thai"},
+  {Date:"2026-01-06",Pics:514,Company:"Jewel"},
+  {Date:"2026-01-08",Pics:1600,Company:"Thai"},
+  {Date:"2026-01-13",Pics:1148,Company:"Ayesah"},
+  {Date:"2026-01-13",Pics:794,Company:"Thai"},
+  {Date:"2026-01-15",Pics:1600,Company:"Jewel"},
+  {Date:"2026-01-15",Pics:1200,Company:"Thai"},
+  {Date:"2026-01-18",Pics:1072,Company:"Thai"},
+  {Date:"2026-01-19",Pics:600,Company:"Energy"},
+  {Date:"2026-01-19",Pics:1034,Company:"Ayesah"},
+  {Date:"2026-01-21",Pics:1492,Company:"Thai"},
+  {Date:"2026-01-24",Pics:1445,Company:"Thai"},
+  {Date:"2026-01-26",Pics:1100,Company:"Jewel"},
+  {Date:"2026-01-27",Pics:919,Company:"Thai"},
+  {Date:"2026-01-28",Pics:1059,Company:"Ayesah"},
+  {Date:"2026-01-28",Pics:600,Company:"Energy"},
+  {Date:"2026-01-29",Pics:380,Company:"Jewel"},
+  {Date:"2026-02-01",Pics:850,Company:"Ayesah"},
+  {Date:"2026-02-02",Pics:1118,Company:"Jewel"},
+  {Date:"2026-02-05",Pics:1508,Company:"Thai"},
+  {Date:"2026-02-05",Pics:600,Company:"Thai"},
+  {Date:"2026-02-07",Pics:1018,Company:"Ayesah"},
+  {Date:"2026-02-07",Pics:600,Company:"Energy"},
+  {Date:"2026-02-07",Pics:748,Company:"Jewel"},
+  {Date:"2026-02-09",Pics:1400,Company:"Thai"},
+  {Date:"2026-02-09",Pics:547,Company:"Jewel"},
+  {Date:"2026-02-14",Pics:1300,Company:"Ayesah"},
+  {Date:"2026-02-14",Pics:678,Company:"Jewel"},
+  {Date:"2026-02-16",Pics:620,Company:"Jewel"},
+  {Date:"2026-02-17",Pics:1082,Company:"Ayesah"},
+  {Date:"2026-02-17",Pics:600,Company:"Jewel"},
+  {Date:"2026-02-18",Pics:1159,Company:"Thai"},
+  {Date:"2026-02-20",Pics:635,Company:"Energy"},
+  {Date:"2026-02-20",Pics:1125,Company:"Jewel"},
+  {Date:"2026-02-24",Pics:426,Company:"Energy"},
+  {Date:"2026-02-24",Pics:1111,Company:"Ayesah"},
+  {Date:"2026-02-26",Pics:1204,Company:"Ajij"},
+  {Date:"2026-02-26",Pics:1059,Company:"Thai"},
+  {Date:"2026-02-27",Pics:1037,Company:"Jewel"},
+  {Date:"2026-02-28",Pics:600,Company:"Ayesah"},
+  {Date:"2026-02-28",Pics:1000,Company:"Energy"},
+  {Date:"2026-02-28",Pics:369,Company:"Ayesah"},
+  {Date:"2026-03-02",Pics:1000,Company:"Ajij"},
+  {Date:"2026-03-03",Pics:800,Company:"Jewel"},
+  {Date:"2026-03-05",Pics:600,Company:"Ayesah"},
+  {Date:"2026-03-05",Pics:600,Company:"Energy"},
+  {Date:"2026-03-07",Pics:765,Company:"Jewel"},
+  {Date:"2026-03-09",Pics:600,Company:"Jewel"},
+  {Date:"2026-03-10",Pics:1096,Company:"Ajij"},
+  {Date:"2026-03-10",Pics:1000,Company:"Energy"},
+  {Date:"2026-03-10",Pics:400,Company:"Jewel"},
+  {Date:"2026-03-11",Pics:1200,Company:"Ayesah"},
+  {Date:"2026-03-11",Pics:400,Company:"Jewel"},
+  {Date:"2026-03-12",Pics:1000,Company:"Jewel"},
+  {Date:"2026-03-15",Pics:1000,Company:"Energy"},
+  {Date:"2026-03-15",Pics:314,Company:"Jewel"},
+  {Date:"2026-03-15",Pics:600,Company:"Jewel"},
+  {Date:"2026-03-15",Pics:700,Company:"Ayesah"},
+  {Date:"2026-03-17",Pics:1024,Company:"Jewel"},
+  // Sabbir entries
+  {Date:"2025-03-30",Pics:1800,Company:"Sabbir"},
+  {Date:"2025-11-25",Pics:5000,Company:"Sabbir"},
+  {Date:"2025-12-11",Pics:5846,Company:"Sabbir"},
+  {Date:"2026-01-10",Pics:6050,Company:"Sabbir"},
+  // abid entries
+  {Date:"2023-02-05",Pics:1000,Company:"abid"},
+  {Date:"2023-02-11",Pics:1000,Company:"abid"},
+  {Date:"2023-02-26",Pics:1000,Company:"abid"},
+  {Date:"2023-05-07",Pics:1145,Company:"abid"},
+  {Date:"2023-05-18",Pics:1955,Company:"abid"},
+  // raj entry
+  {Date:"2023-04-16",Pics:500,Company:"raj"},
+  // ===== পূর্বের missing entries =====
+  {Date:"2023-01-24",Pics:700,Company:"Yousuf"},
+  {Date:"2023-01-26",Pics:800,Company:"Yousuf"},
+  {Date:"2023-01-30",Pics:1000,Company:"Yousuf"},
+  {Date:"2023-02-02",Pics:1000,Company:"Yousuf"},
+  {Date:"2023-02-06",Pics:1000,Company:"Yousuf"},
+  {Date:"2023-02-08",Pics:2000,Company:"Energy"},
+  {Date:"2023-02-11",Pics:1000,Company:"Yousuf"},
+  {Date:"2023-02-13",Pics:2000,Company:"Energy"},
+  {Date:"2023-02-13",Pics:1000,Company:"Jewel"},
+  {Date:"2023-02-13",Pics:1000,Company:"Yousuf"},
+  {Date:"2023-02-19",Pics:1000,Company:"Jewel"},
+  {Date:"2023-02-19",Pics:1000,Company:"Yousuf"},
+  {Date:"2023-02-23",Pics:3000,Company:"Energy"},
+  {Date:"2023-02-23",Pics:1059,Company:"Jewel"},
+  {Date:"2023-02-25",Pics:1000,Company:"Yousuf"},
+  {Date:"2023-02-28",Pics:977,Company:"Jewel"},
+  {Date:"2023-02-28",Pics:1148,Company:"Yousuf"},
+  {Date:"2023-03-02",Pics:1064,Company:"Jewel"},
+  {Date:"2023-03-05",Pics:800,Company:"Jewel"},
+  {Date:"2023-03-06",Pics:3000,Company:"Energy"},
+  {Date:"2023-03-06",Pics:1400,Company:"Yousuf"},
+  {Date:"2023-03-09",Pics:1500,Company:"Jewel"},
+  {Date:"2023-03-14",Pics:1000,Company:"AG"},
+  {Date:"2023-03-14",Pics:1515,Company:"Jewel"},
+  {Date:"2023-03-14",Pics:1000,Company:"Yousuf"},
+  {Date:"2023-03-15",Pics:1015,Company:"Jewel"},
+  {Date:"2023-03-16",Pics:600,Company:"Jewel"},
+  {Date:"2023-03-18",Pics:1000,Company:"Jewel"},
+  {Date:"2023-03-19",Pics:525,Company:"Jewel"},
+  {Date:"2023-03-21",Pics:1000,Company:"Jewel"},
+  {Date:"2023-03-22",Pics:1000,Company:"Yousuf"},
+  {Date:"2023-03-25",Pics:1000,Company:"Jewel"},
+  {Date:"2023-03-28",Pics:1000,Company:"Yousuf"},
+  {Date:"2023-03-29",Pics:1000,Company:"Energy"},
+  {Date:"2023-04-03",Pics:1000,Company:"Energy"},
+  {Date:"2023-04-03",Pics:1000,Company:"Yousuf"},
+  {Date:"2023-04-05",Pics:1000,Company:"Energy"},
+  {Date:"2023-04-09",Pics:1000,Company:"Energy"},
+  {Date:"2023-04-12",Pics:1380,Company:"Yousuf"},
+  {Date:"2023-04-17",Pics:1015,Company:"Energy"},
+  {Date:"2023-04-20",Pics:1167,Company:"Yousuf"},
+  {Date:"2023-05-10",Pics:650,Company:"Yousuf"},
+  {Date:"2023-05-20",Pics:1187,Company:"Yousuf"},
+  {Date:"2023-06-01",Pics:1325,Company:"Ajij"},
+  {Date:"2023-06-18",Pics:200,Company:"Unknown"},
+  {Date:"2023-08-28",Pics:200,Company:"Unknown"},
+  {Date:"2023-08-28",Pics:400,Company:"Yousuf"},
+  {Date:"2023-09-13",Pics:605,Company:"Jewel"},
+  {Date:"2025-03-16",Pics:1990,Company:"Liyakot"},
+  {Date:"2025-06-25",Pics:449,Company:"Jewel"},
+  {Date:"2025-08-19",Pics:3920,Company:"Liyakot"},
+  {Date:"2025-11-08",Pics:1800,Company:"Liyakot"},
+  {Date:"2025-11-15",Pics:1200,Company:"Ajij"},
+];
+
+// Normalize ag->AG, filter Total/nan
+rawData = rawData.map(d=>({...d,Company:d.Company==='ag'?'AG':d.Company}));
+rawData = rawData.filter(d=>d.Company && d.Company!=='nan');
+
+// ===== COMPANIES & RATES =====
+let companies = ["Jewel","Akter","Ajij","Yousuf","Sujon","AG","Energy","Arafat","Thai","ABC","Sahalam","Sumon","Ayesah","Fatema","Liyakot","TBS","BKB","Unknown","Total","Sabbir","abid","raj"];
+// Default rates per company (৳ per pic) — user can change
+let rates = {};
+companies.forEach(c => rates[c] = 0); // 0 = not set
+
+let filteredData = [...rawData];
+let sortField = 'Date', sortDir = 1;
+let currentPage = 1;
+const PAGE_SIZE = 25;
+let activeTab = 'table';
+
+const COLORS = ['#00d4aa','#f59e0b','#6366f1','#ef4444','#22c55e','#06b6d4','#f97316','#a855f7','#ec4899','#14b8a6','#84cc16','#eab308','#3b82f6','#e11d48','#0ea5e9','#8b5cf6','#10b981','#f43f5e','#fb923c','#7c3aed'];
+
+function getColor(c) {
+  if(c==='Unknown') return '#94a3b8';
+  if(c==='Total') return '#fb7185';
+  const i=companies.indexOf(c); return COLORS[i%COLORS.length]||'#64748b';
+}
+
+function getRate(d) {
+  return d.customRate || rates[d.Company] || 0;
+}
+
+function getTaka(d) {
+  const r = getRate(d);
+  return r > 0 ? d.Pics * r : 0;
+}
+
+function fmtDate(d){ return d?d.replace(/-/g,'/'):'';}
+function fmtNum(n){ return n.toLocaleString(); }
+function fmtTaka(n){ return n>0?'৳'+n.toLocaleString():'-'; }
+
+function populateYearFilter(){
+  const years=[...new Set(rawData.map(d=>d.Date.slice(0,4)))].sort().reverse();
+  // single filter
+  const sel=document.getElementById('yearFilter');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">সব বছর</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  if(cur) sel.value=cur;
+  // range from/to
+  const yearOpts='<option value="">বছর</option>'+[...years].reverse().map(y=>`<option value="${y}">${y}</option>`).join('');
+  ['fromYear','toYear'].forEach(id=>{
+    const s=document.getElementById(id); if(!s) return;
+    const v=s.value; s.innerHTML=yearOpts; if(v) s.value=v;
+  });
+  // hook range month/day changes
+  ['fromMonth','toMonth'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el&&!el._hooked){ el._hooked=true; el.addEventListener('change',populateRangeDays); }
+  });
+  ['fromYear','toYear'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el&&!el._hooked){ el._hooked=true; el.addEventListener('change',populateRangeDays); }
+  });
+}
+
+// ---- Day dropdown helper ----
+function buildDayOptions(selId, yr, mo){
+  const sel=document.getElementById(selId);
+  const cur=sel.value;
+  let max=31;
+  if(yr&&mo) max=new Date(parseInt(yr),parseInt(mo),0).getDate();
+  const days=[];
+  for(let i=1;i<=max;i++) days.push(String(i).padStart(2,'0'));
+  const label=selId.includes('from')||selId.includes('to') ? 'দিন':'সব দিন';
+  sel.innerHTML=`<option value="">${label}</option>`+days.map(d=>`<option value="${d}">${parseInt(d)}</option>`).join('');
+  if(cur&&days.includes(cur)) sel.value=cur;
+}
+
+function populateDayFilter(){
+  const yr=document.getElementById('yearFilter').value;
+  const mo=document.getElementById('monthFilter').value;
+  buildDayOptions('dayFilter',yr,mo);
+}
+
+function populateRangeDays(){
+  buildDayOptions('fromDay', document.getElementById('fromYear').value, document.getElementById('fromMonth').value);
+  buildDayOptions('toDay',   document.getElementById('toYear').value,   document.getElementById('toMonth').value);
+}
+
+function onYearMonthChange(){
+  populateDayFilter();
+  applyFilters();
+}
+
+// ---- নির্দিষ্ট তারিখ/মাস/বছর ফিল্টার ----
+function applyFilters() {
+  const co=document.getElementById('companyFilter').value;
+  const yr=document.getElementById('yearFilter').value;
+  const mo=document.getElementById('monthFilter').value;
+  const dy=document.getElementById('dayFilter').value;
+  // clear range UI highlight
+  filteredData=rawData.filter(d=>{
+    if(co&&d.Company!==co)return false;
+    if(yr&&d.Date.slice(0,4)!==yr)return false;
+    if(mo&&d.Date.slice(5,7)!==mo)return false;
+    if(dy&&d.Date.slice(8,10)!==dy)return false;
+    return true;
+  });
+  currentPage=1; render();
+}
+
+// ---- রেঞ্জ ফিল্টার ----
+function applyRangeFilter(){
+  const fromY=document.getElementById('fromYear').value;
+  const fromM=document.getElementById('fromMonth').value;
+  const fromD=document.getElementById('fromDay').value;
+  const toY=document.getElementById('toYear').value;
+  const toM=document.getElementById('toMonth').value;
+  const toD=document.getElementById('toDay').value;
+
+  if(!fromY && !toY){ showNotif('শুরু বা শেষ বছর দিন!',true); return; }
+
+  // Build date strings — if partial, use first/last of that period
+  const fromDate = fromY
+    ? (fromY+'-'+(fromM||'01')+'-'+(fromD||'01'))
+    : '0000-01-01';
+  const toDate = toY
+    ? (toY+'-'+(toM||'12')+'-'+(toD||(toM?new Date(parseInt(toY),parseInt(toM),0).getDate():'31')))
+    : '9999-12-31';
+
+  // clear single-filter
+  document.getElementById('yearFilter').value='';
+  document.getElementById('monthFilter').value='';
+  document.getElementById('dayFilter').value='';
+  document.getElementById('companyFilter').value='';
+
+  filteredData=rawData.filter(d=> d.Date>=fromDate && d.Date<=toDate);
+  currentPage=1; render();
+
+  const rLabel = fromDate+' → '+toDate;
+  showNotif('রেঞ্জ: '+rLabel+' ('+filteredData.length+' রেকর্ড)');
+}
+
+function clearFilters(){
+  ['companyFilter','yearFilter','monthFilter','dayFilter','fromYear','fromMonth','fromDay','toYear','toMonth','toDay']
+    .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  filteredData=[...rawData]; currentPage=1; render();
+}
+
+function sortBy(field){
+  if(sortField===field)sortDir*=-1; else{sortField=field;sortDir=1;} render();
+}
+
+function render(){
+  const sorted=[...filteredData].sort((a,b)=>{
+    if(sortField==='sl')return sortDir;
+    if(sortField==='Taka') return (getTaka(a)-getTaka(b))*sortDir;
+    if(sortField==='Rate') return (getRate(a)-getRate(b))*sortDir;
+    const av=a[sortField==='Company Name'?'Company':sortField]||'';
+    const bv=b[sortField==='Company Name'?'Company':sortField]||'';
+    if(sortField==='Pics')return(av-bv)*sortDir;
+    return String(av).localeCompare(String(bv))*sortDir;
+  });
+
+  const totalPics=filteredData.reduce((s,d)=>s+d.Pics,0);
+  const totalTaka=filteredData.reduce((s,d)=>s+getTaka(d),0);
+  const allTotal=rawData.reduce((s,d)=>s+d.Pics,0);
+
+  document.getElementById('statTotal').textContent=fmtNum(totalPics);
+  document.getElementById('statRows').textContent=filteredData.length+' টি রেকর্ড';
+  document.getElementById('statTaka').textContent=totalTaka>0?'৳'+fmtNum(totalTaka):'(রেট দিন)';
+  document.getElementById('statTakaSub').textContent=totalTaka>0?'মোট আয়':'💰 রেট সেটিং করুন';
+  document.getElementById('statAllTotal').textContent=fmtNum(allTotal);
+  document.getElementById('statAllRows').textContent=rawData.length+' টি মোট রেকর্ড';
+
+  const cmap={};
+  filteredData.forEach(d=>cmap[d.Company]=(cmap[d.Company]||0)+d.Pics);
+  const top=Object.entries(cmap).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('statTopCompany').textContent=top?top[0]:'—';
+  document.getElementById('statTopPics').textContent=top?fmtNum(top[1])+' পিছ':'';
+  document.getElementById('statCompanyCount').textContent=Object.keys(cmap).length;
+  document.getElementById('recordCount').textContent=filteredData.length+' রেকর্ড';
+
+  if(activeTab==='table')renderTable(sorted);
+  else if(activeTab==='chart')renderChart(cmap);
+  else if(activeTab==='summary')renderSummary(cmap);
+  else if(activeTab==='taka')renderTaka(cmap);
+}
+
+function renderTable(sorted){
+  const start=(currentPage-1)*PAGE_SIZE;
+  const page=sorted.slice(start,start+PAGE_SIZE);
+  const tbody=document.getElementById('tableBody');
+  tbody.innerHTML=page.length?page.map((d,i)=>{
+    const gi=rawData.indexOf(d);
+    const color=getColor(d.Company);
+    const rate=getRate(d);
+    const taka=getTaka(d);
+    return`<tr>
+      <td class="date-cell">${start+i+1}</td>
+      <td class="date-cell">${fmtDate(d.Date)}</td>
+      <td><span class="company-badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${d.Company}</span></td>
+      <td class="pics-cell">${fmtNum(d.Pics)}</td>
+      <td class="rate-cell">${rate>0?'৳'+rate:'-'}</td>
+      <td class="taka-cell">${fmtTaka(taka)}</td>
+      <td>
+        ${isEditor()?`<button class="btn btn-secondary btn-sm" onclick="editRow(${gi})">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteRow(${gi})">🗑</button>`
+        :`<span style="font-size:10px;color:var(--muted)">🔒</span>`}
+      </td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="7"><div class="empty-state"><div class="icon">🔍</div>কোনো ডাটা নেই</div></td></tr>`;
+
+  const totalPages=Math.ceil(sorted.length/PAGE_SIZE);
+  document.getElementById('paginationInfo').textContent=`${start+1}–${Math.min(start+PAGE_SIZE,sorted.length)} / ${sorted.length}`;
+  const pb=document.getElementById('pageBtns');
+  pb.innerHTML='';
+  if(totalPages>1){
+    const addBtn=(lbl,p,dis,act)=>{
+      const b=document.createElement('button');
+      b.className='page-btn'+(act?' active':'');
+      b.textContent=lbl; b.disabled=dis;
+      b.onclick=()=>{currentPage=p;render();}; pb.appendChild(b);
+    };
+    addBtn('‹',currentPage-1,currentPage===1,false);
+    for(let p=Math.max(1,currentPage-2);p<=Math.min(totalPages,currentPage+2);p++)addBtn(p,p,false,p===currentPage);
+    addBtn('›',currentPage+1,currentPage===totalPages,false);
+  }
+}
+
+function renderChart(cmap){
+  const entries=Object.entries(cmap).sort((a,b)=>b[1]-a[1]);
+  const max=entries[0]?.[1]||1;
+  document.getElementById('chartArea').innerHTML=entries.length?entries.map(([co,pics])=>{
+    const pct=(pics/max*100).toFixed(1);
+    const color=getColor(co);
+    return`<div class="bar-row">
+      <div class="bar-label">${co}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}">${fmtNum(pics)}</div></div>
+      <div class="bar-total">${fmtNum(pics)}</div>
+    </div>`;
+  }).join(''):`<div class="empty-state"><div class="icon">📊</div>ডাটা নেই</div>`;
+}
+
+function renderSummary(cmap){
+  const entries=Object.entries(cmap).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('summaryGrid').innerHTML=entries.length?entries.map(([co,pics])=>{
+    const count=filteredData.filter(d=>d.Company===co).length;
+    const taka=filteredData.filter(d=>d.Company===co).reduce((s,d)=>s+getTaka(d),0);
+    const color=getColor(co);
+    return`<div class="company-sum-card" style="border-left:3px solid ${color}">
+      <div class="csm-name" style="color:${color}">${co}</div>
+      <div class="csm-pics">${fmtNum(pics)}</div>
+      <div class="csm-taka">${taka>0?'৳'+fmtNum(taka):'রেট নেই'}</div>
+      <div class="csm-count">${count} টি এন্ট্রি</div>
+    </div>`;
+  }).join(''):`<div class="empty-state"><div class="icon">🏢</div>ডাটা নেই</div>`;
+}
+
+function renderTaka(cmap){
+  const entries=Object.entries(cmap).sort((a,b)=>b[1]-a[1]);
+  let grandTotal=0;
+  const rows=entries.map(([co,pics])=>{
+    const rate=rates[co]||0;
+    const taka=rate>0?pics*rate:0;
+    grandTotal+=taka;
+    const color=getColor(co);
+    return`<tr>
+      <td><span class="company-badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${co}</span></td>
+      <td class="pics-cell">${fmtNum(pics)}</td>
+      <td class="rate-cell">${rate>0?'৳'+rate:'<span style="color:var(--muted)">রেট নেই</span>'}</td>
+      <td class="taka-cell" style="font-size:14px;">${taka>0?'৳'+fmtNum(taka):'—'}</td>
+      <td class="date-cell">${filteredData.filter(d=>d.Company===co).length}</td>
+    </tr>`;
+  });
+  if(grandTotal>0) rows.push(`<tr style="border-top:2px solid var(--accent)">
+    <td colspan="3" style="text-align:right;font-weight:600;color:var(--accent)">মোট</td>
+    <td class="taka-cell" style="font-size:16px;font-family:'Syne',sans-serif;">৳${fmtNum(grandTotal)}</td>
+    <td></td>
+  </tr>`);
+  document.getElementById('takaBody').innerHTML=rows.join('');
+  document.getElementById('takaTotal').textContent=grandTotal>0?'মোট: ৳'+fmtNum(grandTotal):'রেট সেট করুন';
+}
+
+// ===== MULTI ENTRY =====
+let entryRowCount=0;
+function addEntryRow(){
+  entryRowCount++;
+  const id=entryRowCount;
+  const opts=companies.map(c=>`<option value="${c}">${c}</option>`).join('');
+  const row=document.createElement('div');
+  row.className='entry-row'; row.id='erow-'+id;
+  row.innerHTML=`
+    <div>
+      <div class="row-label">কোম্পানি</div>
+      <select id="er-co-${id}" style="width:100%"><option value="">— সিলেক্ট করুন —</option>${opts}</select>
+    </div>
+    <div>
+      <div class="row-label">পিছ</div>
+      <input type="number" id="er-pics-${id}" placeholder="পিছ সংখ্যা" min="0" style="width:100%">
+    </div>
+    <div>
+      <div class="row-label">রেট (৳) — ঐচ্ছিক</div>
+      <input type="number" id="er-rate-${id}" placeholder="ডিফল্ট রেট" min="0" style="width:100%">
+    </div>
+    <button class="remove-row-btn" onclick="removeEntryRow(${id})">×</button>
+  `;
+  document.getElementById('entry-rows').appendChild(row);
+}
+
+function removeEntryRow(id){
+  const el=document.getElementById('erow-'+id);
+  if(el) el.remove();
+}
+
+function saveMultiEntry(){
+  const date=document.getElementById('inp-date').value;
+  if(!date){showNotif('তারিখ দিন!',true);return;}
+  const rows=document.querySelectorAll('.entry-row');
+  if(rows.length===0){showNotif('কমপক্ষে একটি কোম্পানি যোগ করুন!',true);return;}
+  let added=0, errors=0;
+  rows.forEach(row=>{
+    const id=row.id.split('-')[1];
+    const co=document.getElementById('er-co-'+id)?.value;
+    const pics=parseInt(document.getElementById('er-pics-'+id)?.value);
+    const rate=parseFloat(document.getElementById('er-rate-'+id)?.value)||0;
+    if(!co||isNaN(pics)||pics<=0){errors++;return;}
+    const entry={Date:date,Pics:pics,Company:co};
+    if(rate>0)entry.customRate=rate;
+    rawData.push(entry); added++;
+  });
+  if(added===0){showNotif('কোনো বৈধ ডাটা নেই!',true);return;}
+  if(errors>0)showNotif(`${added}টি যোগ হয়েছে, ${errors}টি বাদ পড়েছে`);
+  else showNotif(`${added}টি এন্ট্রি যোগ হয়েছে! ✅`);
+  document.getElementById('inp-date').value='';
+  document.getElementById('entry-rows').innerHTML=''; entryRowCount=0;
+  clearFilters(); closeModal('add');
+}
+
+// ===== RATES =====
+function openRateModal(){
+  const tbody=document.getElementById('rateTableBody');
+  tbody.innerHTML=companies.map(c=>`<tr>
+    <td><span class="company-badge" style="background:${getColor(c)}22;color:${getColor(c)};border:1px solid ${getColor(c)}44">${c}</span></td>
+    <td><input type="number" id="rate-${c}" value="${rates[c]||''}" placeholder="০" min="0"></td>
+    <td style="color:var(--muted)">${rates[c]>0?'৳'+(1000*rates[c]).toLocaleString():'—'}</td>
+  </tr>`).join('');
+}
+
+function saveRates(){
+  companies.forEach(c=>{
+    const v=parseFloat(document.getElementById('rate-'+c)?.value)||0;
+    rates[c]=v;
+  });
+  render(); closeModal('rates');
+  showNotif('রেট সেভ হয়েছে! ✅');
+}
+
+// ===== COMPANY MANAGEMENT =====
+function updateCompanySelects(){
+  const opts=companies.map(c=>`<option value="${c}">${c}</option>`).join('');
+  document.getElementById('companyFilter').innerHTML=`<option value="">সব কোম্পানি</option>`+opts;
+  document.getElementById('edit-company').innerHTML=opts;
+  renderCompanyTags();
+}
+
+function renderCompanyTags(){
+  document.getElementById('companyTagList').innerHTML=companies.map((c,i)=>{
+    const color=getColor(c);
+    return`<div class="company-tag" style="border-color:${color}44;color:${color}">
+      ${c}<button class="del-btn" onclick="removeCompany(${i})">×</button>
+    </div>`;
+  }).join('');
+}
+
+function addCompany(){
+  const name=document.getElementById('inp-new-company').value.trim();
+  if(!name)return;
+  if(companies.includes(name)){showNotif('আগে থেকেই আছে!',true);return;}
+  companies.push(name); rates[name]=0;
+  document.getElementById('inp-new-company').value='';
+  updateCompanySelects(); showNotif(`"${name}" যোগ হয়েছে!`);
+}
+
+function removeCompany(idx){
+  const name=companies[idx];
+  if(rawData.some(d=>d.Company===name)){showNotif('ডাটা আছে, মোছা যাবে না!',true);return;}
+  companies.splice(idx,1); delete rates[name];
+  updateCompanySelects(); showNotif(`"${name}" মোছা হয়েছে`);
+}
+
+// ===== EDIT/DELETE =====
+function editRow(idx){
+  const d=rawData[idx];
+  document.getElementById('edit-idx').value=idx;
+  document.getElementById('edit-date').value=d.Date;
+  document.getElementById('edit-company').value=d.Company;
+  document.getElementById('edit-pics').value=d.Pics;
+  document.getElementById('edit-rate').value=d.customRate||'';
+  openModal('edit');
+}
+
+function saveEdit(){
+  const idx=parseInt(document.getElementById('edit-idx').value);
+  const date=document.getElementById('edit-date').value;
+  const company=document.getElementById('edit-company').value;
+  const pics=parseInt(document.getElementById('edit-pics').value);
+  const rate=parseFloat(document.getElementById('edit-rate').value)||0;
+  if(!date||!company||isNaN(pics)){showNotif('সব ঘর পূরণ করুন!',true);return;}
+  const entry={Date:date,Pics:pics,Company:company};
+  if(rate>0)entry.customRate=rate;
+  rawData[idx]=entry; applyFilters(); closeModal('edit');
+  showNotif('আপডেট হয়েছে! ✅');
+}
+
+function deleteRow(idx){
+  if(!confirm('এই রেকর্ডটি মুছবেন?'))return;
+  rawData.splice(idx,1); applyFilters(); showNotif('মুছা হয়েছে');
+}
+
+// ===== MODALS =====
+function openModal(id){
+  document.getElementById('modal-'+id).classList.add('open');
+  if(id==='company')renderCompanyTags();
+  if(id==='rates')openRateModal();
+  if(id==='add'){
+    document.getElementById('entry-rows').innerHTML=''; entryRowCount=0;
+    addEntryRow();
+  }
+}
+function closeModal(id){document.getElementById('modal-'+id).classList.remove('open');}
+document.querySelectorAll('.modal-overlay').forEach(o=>{
+  o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});
+});
+
+function switchTab(tab,el){
+  activeTab=tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); el.classList.add('active');
+  ['table','chart','summary','taka'].forEach(v=>document.getElementById('view-'+v).style.display=v===tab?'':'none');
+  render();
+}
+
+function showNotif(msg,isError=false){
+  const n=document.getElementById('notif');
+  n.textContent=msg; n.className='notif'+(isError?' error':'');
+  setTimeout(()=>n.classList.add('show'),10);
+  setTimeout(()=>n.classList.remove('show'),2800);
+}
+
+// ===== INPUT SECTION =====
+let inpRowCount=0;
+
+function toggleInputSection(){
+  const sec=document.getElementById('inputSection');
+  const icon=document.getElementById('inputToggleIcon');
+  sec.classList.toggle('collapsed');
+  icon.textContent=sec.classList.contains('collapsed')?'▶':'▼';
+}
+
+function populateInpYearFilter(){
+  const years=[...new Set(rawData.map(d=>d.Date.slice(0,4)))].sort().reverse();
+  // Add current year if not present
+  const curY=String(new Date().getFullYear());
+  if(!years.includes(curY)) years.unshift(curY);
+  const sel=document.getElementById('inp-year');
+  sel.innerHTML='<option value="">বছর</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  // default to current year
+  sel.value=curY;
+  updateInpDayOptions();
+}
+
+function updateInpDayOptions(){
+  const yr=document.getElementById('inp-year').value;
+  const mo=document.getElementById('inp-month').value;
+  const sel=document.getElementById('inp-day');
+  const cur=sel.value;
+  let maxDay=31;
+  if(yr&&mo) maxDay=new Date(parseInt(yr),parseInt(mo),0).getDate();
+  const days=[];
+  for(let i=1;i<=maxDay;i++) days.push(String(i).padStart(2,'0'));
+  sel.innerHTML='<option value="">দিন</option>'+days.map(d=>`<option value="${d}">${parseInt(d)}</option>`).join('');
+  if(cur&&days.includes(cur)) sel.value=cur;
+  updateInpDatePreview();
+}
+
+function updateInpDatePreview(){
+  const yr=document.getElementById('inp-year').value;
+  const mo=document.getElementById('inp-month').value;
+  const dy=document.getElementById('inp-day').value;
+  const months=['','জানু','ফেব্রু','মার্চ','এপ্রিল','মে','জুন','জুলাই','আগস্ট','সেপ্টে','অক্টো','নভে','ডিসে'];
+  const prev=document.getElementById('inpDatePreview');
+  if(yr&&mo&&dy) prev.textContent=parseInt(dy)+' '+months[parseInt(mo)]+' '+yr;
+  else if(yr&&mo) prev.textContent=months[parseInt(mo)]+' '+yr;
+  else if(yr) prev.textContent=yr+' সাল';
+  else prev.textContent='তারিখ নির্বাচন করুন';
+}
+
+document.getElementById('inp-year').addEventListener('change', updateInpDatePreview);
+document.getElementById('inp-month').addEventListener('change', updateInpDatePreview);
+document.getElementById('inp-day').addEventListener('change', updateInpDatePreview);
+
+function getInpDate(){
+  const yr=document.getElementById('inp-year').value;
+  const mo=document.getElementById('inp-month').value;
+  const dy=document.getElementById('inp-day').value;
+  if(!yr||!mo||!dy) return null;
+  return yr+'-'+mo+'-'+dy;
+}
+
+function addInpRow(){
+  inpRowCount++;
+  const id=inpRowCount;
+  const opts=companies.map(c=>`<option value="${c}">${c}</option>`).join('');
+  const row=document.createElement('div');
+  row.className='entry-row'; row.id='inprow-'+id;
+  row.innerHTML=`
+    <div>
+      <div class="row-label">কোম্পানি</div>
+      <select id="inr-co-${id}" style="width:100%"><option value="">— সিলেক্ট করুন —</option>${opts}</select>
+    </div>
+    <div>
+      <div class="row-label">পিছ</div>
+      <input type="number" id="inr-pics-${id}" placeholder="পিছ সংখ্যা" min="0" style="width:100%">
+    </div>
+    <div>
+      <div class="row-label">রেট (৳) — ঐচ্ছিক</div>
+      <input type="number" id="inr-rate-${id}" placeholder="ডিফল্ট রেট" min="0" style="width:100%">
+    </div>
+    <button class="remove-row-btn" onclick="document.getElementById('inprow-${id}').remove()">×</button>
+  `;
+  document.getElementById('inp-entry-rows').appendChild(row);
+}
+
+function clearInputSection(){
+  document.getElementById('inp-entry-rows').innerHTML='';
+  inpRowCount=0;
+  addInpRow();
+}
+
+function saveInputSection(){
+  const date=getInpDate();
+  if(!date){showNotif('বছর, মাস ও দিন সব নির্বাচন করুন!',true);return;}
+  const rows=document.querySelectorAll('#inp-entry-rows .entry-row');
+  if(rows.length===0){showNotif('কমপক্ষে একটি কোম্পানি যোগ করুন!',true);return;}
+  let added=0, errors=0;
+  rows.forEach(row=>{
+    const id=row.id.split('-')[1];
+    const co=document.getElementById('inr-co-'+id)?.value;
+    const pics=parseInt(document.getElementById('inr-pics-'+id)?.value);
+    const rate=parseFloat(document.getElementById('inr-rate-'+id)?.value)||0;
+    if(!co||isNaN(pics)||pics<=0){errors++;return;}
+    const entry={Date:date,Pics:pics,Company:co};
+    if(rate>0)entry.customRate=rate;
+    rawData.push(entry); added++;
+  });
+  if(added===0){showNotif('কোনো বৈধ ডাটা নেই!',true);return;}
+  populateYearFilter();
+  clearFilters();
+  if(errors>0) showNotif(added+'টি যোগ হয়েছে, '+errors+'টি বাদ পড়েছে');
+  else showNotif(added+'টি এন্ট্রি যোগ হয়েছে! ✅ ('+date+')');
+  // reset rows
+  document.getElementById('inp-entry-rows').innerHTML='';
+  inpRowCount=0; addInpRow();
+}
+
+// ===== AUTH SYSTEM =====
+const EDITOR_PASS = 'admin123'; // ← এখানে পাসওয়ার্ড পরিবর্তন করুন
+let _authMode = 'viewer'; // 'viewer' | 'editor'
+let _authTab = 'viewer';
+
+function isEditor(){ return _authMode === 'editor'; }
+
+function switchAuthTab(tab){
+  _authTab = tab;
+  document.getElementById('tabViewer').classList.toggle('active', tab==='viewer');
+  document.getElementById('tabEditor').classList.toggle('active', tab==='editor');
+  document.getElementById('editorPassWrap').style.display = tab==='editor' ? 'block' : 'none';
+  document.getElementById('authHintText').textContent = tab==='viewer'
+    ? 'Viewer হিসেবে সব ডাটা দেখতে পাবেন'
+    : 'Editor হিসেবে ডাটা যোগ/সম্পাদনা করতে পারবেন';
+  document.getElementById('authError').textContent = '';
+  if(tab==='editor') setTimeout(()=>document.getElementById('authPassInput').focus(),100);
+}
+
+function togglePassVisibility(){
+  const inp = document.getElementById('authPassInput');
+  inp.type = inp.type==='password' ? 'text' : 'password';
+}
+
+function doLogin(){
+  if(_authTab === 'viewer'){
+    setMode('viewer');
+    return;
+  }
+  const pass = document.getElementById('authPassInput').value;
+  if(pass === EDITOR_PASS){
+    setMode('editor');
+  } else {
+    const inp = document.getElementById('authPassInput');
+    inp.classList.add('error');
+    document.getElementById('authError').textContent = '❌ ভুল পাসওয়ার্ড! আবার চেষ্টা করুন।';
+    inp.value = '';
+    setTimeout(()=>inp.classList.remove('error'), 500);
+    inp.focus();
+  }
+}
+
+function setMode(mode){
+  _authMode = mode;
+  document.getElementById('authOverlay').style.display = 'none';
+  updateModeUI();
+  render();
+}
+
+function updateModeUI(){
+  const badge = document.getElementById('modeBadge');
+  const icon = document.getElementById('modeIcon');
+  const text = document.getElementById('modeText');
+  const btnRates = document.getElementById('btnRates');
+  const btnCompany = document.getElementById('btnCompany');
+  const lockedNotice = document.getElementById('inputLockedNotice');
+  const editContent = document.getElementById('inputEditContent');
+
+  if(_authMode === 'editor'){
+    badge.className = 'mode-badge editor';
+    icon.textContent = '✏️'; text.textContent = 'Editor';
+    btnRates.style.display = ''; btnCompany.style.display = '';
+    document.getElementById('btnUpload').style.display = '';
+    lockedNotice.style.display = 'none'; editContent.style.display = '';
+  } else {
+    badge.className = 'mode-badge viewer';
+    icon.textContent = '👁'; text.textContent = 'Viewer';
+    btnRates.style.display = 'none'; btnCompany.style.display = 'none';
+    document.getElementById('btnUpload').style.display = 'none';
+    lockedNotice.style.display = ''; editContent.style.display = 'none';
+  }
+}
+
+function guardedAction(fn){
+  if(isEditor()) fn();
+  else showLoginFromLock();
+}
+
+function showLoginFromLock(){
+  const overlay = document.getElementById('authOverlay');
+  overlay.style.display = 'flex';
+  switchAuthTab('editor');
+  document.getElementById('authError').textContent = '';
+  document.getElementById('authPassInput').value = '';
+  setTimeout(()=>document.getElementById('authPassInput').focus(), 150);
+}
+
+function showLogoutPrompt(){
+  if(_authMode === 'editor'){
+    if(confirm('Editor মোড থেকে বের হবেন?')){
+      _authMode = 'viewer';
+      updateModeUI();
+      render();
+    }
+  } else {
+    showLoginFromLock();
+  }
+}
+
+// Override saveInputSection to guard
+const _origSaveInput = saveInputSection;
+saveInputSection = function(){
+  if(!isEditor()){ showLoginFromLock(); return; }
+  _origSaveInput();
+};
+
+// Override addData / saveEdit / deleteRow / saveRates / addCompany / removeCompany to guard
+const _origDeleteRow = deleteRow;
+deleteRow = function(idx){
+  if(!isEditor()){ showLoginFromLock(); return; }
+  _origDeleteRow(idx);
+};
+
+const _origSaveEdit = saveEdit;
+saveEdit = function(){
+  if(!isEditor()){ showLoginFromLock(); return; }
+  _origSaveEdit();
+};
+
+const _origSaveRates = saveRates;
+saveRates = function(){
+  if(!isEditor()){ showLoginFromLock(); return; }
+  _origSaveRates();
+};
+
+const _origAddCompany = addCompany;
+addCompany = function(){
+  if(!isEditor()){ showLoginFromLock(); return; }
+  _origAddCompany();
+};
+
+const _origRemoveCompany = removeCompany;
+removeCompany = function(idx){
+  if(!isEditor()){ showLoginFromLock(); return; }
+  _origRemoveCompany(idx);
+};
+
+// ===== FIREBASE INTEGRATION =====
+
+let _fbKeyMap = []; // Maps rawData index → Firebase key
+
+function showSync(state, text){
+  const el = document.getElementById('syncStatus');
+  const txt = document.getElementById('syncText');
+  el.className = 'syncStatus show ' + state;
+  txt.textContent = text;
+  if(state === 'synced') setTimeout(()=> el.classList.remove('show'), 2500);
+}
+
+function fbSaveAll(){
+  // Upload entire rawData to Firebase (first time / reset)
+  if(!window._fb){ showNotif('Firebase সংযোগ নেই!', true); return; }
+  showSync('syncing','সব ডাটা আপলোড হচ্ছে...');
+  const {db, ref, set} = window._fb;
+  const entries = {};
+  rawData.forEach((d, i) => {
+    const key = 'entry_' + i;
+    entries[key] = { Date: d.Date, Pics: d.Pics, Company: d.Company, ...(d.customRate?{rate:d.customRate}:{}) };
+  });
+  set(ref(db, 'salesData'), entries)
+    .then(()=>{ showSync('synced','✅ সব আপলোড সম্পন্ন'); showNotif('Firebase এ সব ডাটা আপলোড হয়েছে! ✅'); })
+    .catch(e=>{ showSync('error','❌ Error: '+e.message); showNotif('Error: '+e.message, true); });
+}
+
+function fbPushEntry(entry){
+  if(!window._fb) return;
+  showSync('syncing','সিঙ্ক হচ্ছে...');
+  const {db, ref, push} = window._fb;
+  const data = { Date: entry.Date, Pics: entry.Pics, Company: entry.Company };
+  if(entry.customRate) data.rate = entry.customRate;
+  push(ref(db, 'salesData'), data)
+    .then(()=> showSync('synced','✅ সিঙ্ক সম্পন্ন'))
+    .catch(e=> showSync('error','❌ '+e.message));
+}
+
+function fbUpdateEntry(fbKey, entry){
+  if(!window._fb || !fbKey) return;
+  showSync('syncing','আপডেট হচ্ছে...');
+  const {db, ref, update} = window._fb;
+  const data = { Date: entry.Date, Pics: entry.Pics, Company: entry.Company };
+  if(entry.customRate) data.rate = entry.customRate;
+  update(ref(db, 'salesData/'+fbKey), data)
+    .then(()=> showSync('synced','✅ আপডেট সম্পন্ন'))
+    .catch(e=> showSync('error','❌ '+e.message));
+}
+
+function fbDeleteEntry(fbKey){
+  if(!window._fb || !fbKey) return;
+  showSync('syncing','মুছে ফেলা হচ্ছে...');
+  const {db, ref, remove} = window._fb;
+  remove(ref(db, 'salesData/'+fbKey))
+    .then(()=> showSync('synced','✅ মুছা সম্পন্ন'))
+    .catch(e=> showSync('error','❌ '+e.message));
+}
+
+function fbSaveRates(ratesObj){
+  if(!window._fb) return;
+  const {db, ref, set} = window._fb;
+  set(ref(db, 'rates'), ratesObj);
+}
+
+function listenFirebase(){
+  if(!window._fb){ console.warn('FB not ready'); return; }
+  const {db, ref, onValue} = window._fb;
+
+  // Listen salesData
+  onValue(ref(db, 'salesData'), (snapshot) => {
+    const data = snapshot.val();
+    document.getElementById('fbLoadOverlay').style.display = 'none';
+    if(!data){
+      // No data in Firebase yet — upload local data
+      showNotif('Firebase খালি! ডাটা আপলোড হচ্ছে...', false);
+      fbSaveAll();
+      return;
+    }
+    // Rebuild rawData from Firebase
+    rawData = [];
+    _fbKeyMap = [];
+    Object.entries(data).forEach(([key, val]) => {
+      if(!val || !val.Date || !val.Pics || !val.Company) return;
+      const entry = { Date: val.Date, Pics: val.Pics, Company: val.Company, _fbKey: key };
+      if(val.rate) entry.customRate = val.rate;
+      rawData.push(entry);
+      _fbKeyMap.push(key);
+    });
+    filteredData = [...rawData];
+    populateYearFilter();
+    updateCompanySelects();
+    clearFilters();
+  }, (error) => {
+    document.getElementById('fbLoadOverlay').style.display = 'none';
+    showNotif('Firebase সংযোগ ব্যর্থ: ' + error.message, true);
+  });
+
+  // Listen rates
+  onValue(ref(db, 'rates'), (snapshot) => {
+    const data = snapshot.val();
+    if(data) { Object.assign(rates, data); render(); }
+  });
+}
+
+// Override data-mutation functions to sync with Firebase
+const _origSaveInputSection = saveInputSection;
+saveInputSection = function(){
+  if(!isEditor()){ showLoginFromLock(); return; }
+  const date=getInpDate();
+  if(!date){showNotif('বছর, মাস ও দিন সব নির্বাচন করুন!',true);return;}
+  const rows=document.querySelectorAll('#inp-entry-rows .entry-row');
+  if(rows.length===0){showNotif('কমপক্ষে একটি কোম্পানি যোগ করুন!',true);return;}
+  let added=0, errors=0;
+  rows.forEach(row=>{
+    const id=row.id.split('-')[1];
+    const co=document.getElementById('inr-co-'+id)?.value;
+    const pics=parseInt(document.getElementById('inr-pics-'+id)?.value);
+    const rate=parseFloat(document.getElementById('inr-rate-'+id)?.value)||0;
+    if(!co||isNaN(pics)||pics<=0){errors++;return;}
+    const entry={Date:date,Pics:pics,Company:co};
+    if(rate>0)entry.customRate=rate;
+    fbPushEntry(entry); // Firebase handles adding to rawData via listener
+    added++;
+  });
+  if(added===0){showNotif('কোনো বৈধ ডাটা নেই!',true);return;}
+  if(errors>0) showNotif(added+'টি যোগ হচ্ছে, '+errors+'টি বাদ পড়েছে');
+  else showNotif(added+'টি এন্ট্রি যোগ হচ্ছে... ✅');
+  document.getElementById('inp-entry-rows').innerHTML='';
+  inpRowCount=0; addInpRow();
+};
+
+const _origSaveEdit2 = saveEdit;
+saveEdit = function(){
+  if(!isEditor()){ showLoginFromLock(); return; }
+  const idx=parseInt(document.getElementById('edit-idx').value);
+  const date=document.getElementById('edit-date').value;
+  const company=document.getElementById('edit-company').value;
+  const pics=parseInt(document.getElementById('edit-pics').value);
+  const rate=parseFloat(document.getElementById('edit-rate').value)||0;
+  if(!date||!company||isNaN(pics)){showNotif('সব ঘর পূরণ করুন!',true);return;}
+  const entry={Date:date,Pics:pics,Company:company};
+  if(rate>0)entry.customRate=rate;
+  const fbKey=rawData[idx]?._fbKey;
+  fbUpdateEntry(fbKey, entry);
+  closeModal('edit');
+};
+
+const _origDeleteRow2 = deleteRow;
+deleteRow = function(idx){
+  if(!isEditor()){ showLoginFromLock(); return; }
+  if(!confirm('এই রেকর্ডটি মুছবেন?'))return;
+  const fbKey=rawData[idx]?._fbKey;
+  fbDeleteEntry(fbKey);
+};
+
+const _origSaveRates2 = saveRates;
+saveRates = function(){
+  if(!isEditor()){ showLoginFromLock(); return; }
+  companies.forEach(c=>{
+    const v=parseFloat(document.getElementById('rate-'+c)?.value)||0;
+    rates[c]=v;
+  });
+  fbSaveRates({...rates});
+  render(); closeModal('rates');
+  showNotif('রেট সেভ হয়েছে! ✅');
+};
+
+// ===== INIT =====
+updateCompanySelects(); populateInpYearFilter(); populateDayFilter();
+updateModeUI();
+addInpRow();
+
+// Start Firebase listener when SDK ready
+function startApp(){
+  listenFirebase();
+}
+
+if(window._fbReady){
+  startApp();
+} else {
+  window.addEventListener('fbReady', startApp);
+  // Fallback timeout — if Firebase fails after 8s, show local data
+  setTimeout(()=>{
+    if(document.getElementById('fbLoadOverlay').style.display !== 'none'){
+      document.getElementById('fbLoadOverlay').style.display = 'none';
+      showNotif('Firebase সংযোগ ধীর। Local ডাটা দেখানো হচ্ছে।', true);
+      filteredData=[...rawData]; populateYearFilter(); render();
+    }
+  }, 8000);
+}
+</script>
+</body>
+</html>
