@@ -27,6 +27,8 @@
   window._fbReady = true;
   window.dispatchEvent(new Event('fbReady'));
 </script>
+<!-- SheetJS for Excel parsing -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Tiro+Bangla&family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -370,6 +372,10 @@
     <button class="btn btn-secondary" id="btnRates" onclick="guardedAction(()=>openModal('rates'))">💰 রেট সেটিং</button>
     <button class="btn btn-secondary" id="btnCompany" onclick="guardedAction(()=>openModal('company'))">🏢 কোম্পানি</button>
     <button class="btn btn-secondary" id="btnUpload" onclick="guardedAction(fbSaveAll)" title="সব ডাটা Firebase এ আপলোড করুন" style="display:none">☁️ সব আপলোড</button>
+    <label class="btn btn-warning" id="btnExcelUpload" style="display:none;cursor:pointer;" title="Excel আপলোড করুন">
+      📂 Excel আপলোড
+      <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display:none" onchange="handleExcelUpload(event)">
+    </label>
   </div>
 </header>
 
@@ -1872,12 +1878,14 @@ function updateModeUI(){
     icon.textContent = '✏️'; text.textContent = 'Editor';
     btnRates.style.display = ''; btnCompany.style.display = '';
     document.getElementById('btnUpload').style.display = '';
+    document.getElementById('btnExcelUpload').style.display = '';
     lockedNotice.style.display = 'none'; editContent.style.display = '';
   } else {
     badge.className = 'mode-badge viewer';
     icon.textContent = '👁'; text.textContent = 'Viewer';
     btnRates.style.display = 'none'; btnCompany.style.display = 'none';
     document.getElementById('btnUpload').style.display = 'none';
+    document.getElementById('btnExcelUpload').style.display = 'none';
     lockedNotice.style.display = ''; editContent.style.display = 'none';
   }
 }
@@ -1945,6 +1953,172 @@ removeCompany = function(idx){
   if(!isEditor()){ showLoginFromLock(); return; }
   _origRemoveCompany(idx);
 };
+
+// ===== EXCEL UPLOAD =====
+function handleExcelUpload(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  showSync('syncing', 'Excel পড়া হচ্ছে...');
+  showNotif('Excel ফাইল পড়া হচ্ছে...');
+
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, {type:'array', cellDates:true});
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {raw:false, dateNF:'yyyy-mm-dd'});
+
+      let newEntries = [];
+      let skipped = 0;
+
+      rows.forEach(row => {
+        // Handle column names flexibly
+        const dateRaw = row['Date'] || row['date'] || row['তারিখ'] || '';
+        const picsRaw = row['Pics'] || row['pics'] || row['পিছ'] || row['পিকস'] || '';
+        const compRaw = row['Company Name'] || row['Company'] || row['company'] || row['কোম্পানি'] || '';
+
+        if(!dateRaw || !picsRaw || !compRaw) { skipped++; return; }
+
+        // Normalize date to YYYY-MM-DD
+        let dateStr = '';
+        if(typeof dateRaw === 'string'){
+          // Handle various formats
+          if(dateRaw.match(/^\d{4}-\d{2}-\d{2}$/)) dateStr = dateRaw;
+          else if(dateRaw.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)){
+            const [m,d,y] = dateRaw.split('/');
+            dateStr = y+'-'+m.padStart(2,'0')+'-'+d.padStart(2,'0');
+          } else if(dateRaw.match(/^\d{4}\/\d{2}\/\d{2}$/)){
+            dateStr = dateRaw.replace(/\//g,'-');
+          } else {
+            // Try parse
+            const parsed = new Date(dateRaw);
+            if(!isNaN(parsed)) dateStr = parsed.toISOString().slice(0,10);
+          }
+        } else if(dateRaw instanceof Date){
+          dateStr = dateRaw.toISOString().slice(0,10);
+        }
+
+        if(!dateStr){ skipped++; return; }
+
+        const pics = parseInt(String(picsRaw).replace(/,/g,''));
+        if(isNaN(pics) || pics <= 0){ skipped++; return; }
+
+        let company = String(compRaw).trim();
+        // Normalize
+        if(company.toLowerCase() === 'ag') company = 'AG';
+        if(company === 'nan' || company === 'Total' || !company){ skipped++; return; }
+        if(company === 'Unknown' || company === '') company = 'Unknown';
+
+        // Add to companies list if new
+        if(!companies.includes(company)) {
+          companies.push(company);
+          rates[company] = 0;
+        }
+
+        newEntries.push({ Date: dateStr, Pics: pics, Company: company });
+      });
+
+      if(newEntries.length === 0){
+        showNotif('কোনো বৈধ ডাটা পাওয়া যায়নি!', true);
+        showSync('error', '❌ ডাটা পাওয়া যায়নি');
+        return;
+      }
+
+      // Show preview modal
+      showExcelPreview(newEntries, skipped, file.name);
+
+    } catch(err){
+      showNotif('Excel পড়তে সমস্যা: ' + err.message, true);
+      showSync('error', '❌ Error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  // Reset input so same file can be re-uploaded
+  event.target.value = '';
+}
+
+function showExcelPreview(newEntries, skipped, filename){
+  // Build unique key set of existing data for duplicate detection
+  const existingKeys = new Set(rawData.map(d => d.Date+'|'+d.Company+'|'+d.Pics));
+  const duplicates = newEntries.filter(e => existingKeys.has(e.Date+'|'+e.Company+'|'+e.Pics));
+  const truly_new = newEntries.filter(e => !existingKeys.has(e.Date+'|'+e.Company+'|'+e.Pics));
+
+  // Create preview modal
+  const existing = document.getElementById('modal-excel-preview');
+  if(existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.id = 'modal-excel-preview';
+
+  const topEntries = truly_new.slice(0,5).map(e=>
+    `<tr><td style="color:var(--muted)">${e.Date}</td><td>${e.Company}</td><td style="color:var(--accent)">${e.Pics.toLocaleString()}</td></tr>`
+  ).join('');
+
+  modal.innerHTML = `
+    <div class="modal" style="width:520px">
+      <h2>📂 Excel আপলোড প্রিভিউ</h2>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">ফাইল: ${filename}</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+        <div style="background:var(--card2);border-radius:8px;padding:12px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--success)">${truly_new.length}</div>
+          <div style="font-size:11px;color:var(--muted)">নতুন এন্ট্রি</div>
+        </div>
+        <div style="background:var(--card2);border-radius:8px;padding:12px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--accent2)">${duplicates.length}</div>
+          <div style="font-size:11px;color:var(--muted)">ডুপ্লিকেট (বাদ)</div>
+        </div>
+        <div style="background:var(--card2);border-radius:8px;padding:12px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--muted)">${skipped}</div>
+          <div style="font-size:11px;color:var(--muted)">অসম্পূর্ণ (বাদ)</div>
+        </div>
+      </div>
+
+      ${truly_new.length > 0 ? `
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">নতুন এন্ট্রি (প্রথম ৫টি)</div>
+      <div style="overflow-x:auto;max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:14px;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="background:var(--card2)">
+            <th style="padding:8px 12px;color:var(--muted);text-align:left">তারিখ</th>
+            <th style="padding:8px 12px;color:var(--muted);text-align:left">কোম্পানি</th>
+            <th style="padding:8px 12px;color:var(--muted);text-align:left">পিছ</th>
+          </tr></thead>
+          <tbody>${topEntries}${truly_new.length>5?`<tr><td colspan="3" style="padding:8px 12px;color:var(--muted);text-align:center">...আরো ${truly_new.length-5}টি</td></tr>`:''}</tbody>
+        </table>
+      </div>` : `<div style="padding:20px;text-align:center;color:var(--muted)">কোনো নতুন ডাটা নেই — সব ইতিমধ্যে আছে।</div>`}
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="document.getElementById('modal-excel-preview').remove()">বাতিল</button>
+        ${truly_new.length > 0 ? `<button class="btn btn-primary" onclick="confirmExcelImport(${JSON.stringify(truly_new).replace(/"/g,'&quot;')})">✅ ${truly_new.length}টি যোগ করুন</button>` : ''}
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+}
+
+function confirmExcelImport(entries){
+  document.getElementById('modal-excel-preview')?.remove();
+  if(!window._fb){ showNotif('Firebase সংযোগ নেই!', true); return; }
+
+  showSync('syncing', `${entries.length}টি এন্ট্রি যোগ হচ্ছে...`);
+  const {db, ref, push} = window._fb;
+
+  let done = 0;
+  entries.forEach(entry => {
+    const data = { Date: entry.Date, Pics: entry.Pics, Company: entry.Company };
+    push(ref(db, 'salesData'), data).then(() => {
+      done++;
+      if(done === entries.length){
+        showSync('synced', `✅ ${done}টি যোগ সম্পন্ন`);
+        showNotif(`✅ ${done}টি নতুন এন্ট্রি যোগ হয়েছে!`);
+        updateCompanySelects();
+      }
+    });
+  });
+}
 
 // ===== FIREBASE INTEGRATION =====
 
